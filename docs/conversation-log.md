@@ -179,3 +179,9 @@ TODOの上2つ、強化学習前提の環境API設計と、状態・行動シリ
 
 ### Codex回答
 `docs/rl-environment-design.md` を追加し、`reset(seed)`、`step(action_index)`、`observation`、`legal_action_mask`、`reward`、`done`、`info`、NPC自動進行、乱数管理の方針を整理した。`src/yellowstone/serialization.py` を追加し、`GameState`、盤面、カード、プレイヤー状態、各Action、合法手一覧をJSON互換dictへ変換・復元できるようにした。
+
+### ユーザー入力
+次の2つのTODO、観測表現の設計・実装と、行動空間の設計・実装を依頼した。
+
+### Codex回答
+`docs/observation-action-space.md`、`src/yellowstone/observation.py`、`src/yellowstone/action_space.py` を追加した。観測は盤面、現在手札、プレイヤー概要、現在プレイヤー、フェーズ、スカラーを含む固定長 `tuple[int, ...]` とし、行動空間は配置1050、ターン終了1、補充3の固定長1054 index と合法手 mask にした。
