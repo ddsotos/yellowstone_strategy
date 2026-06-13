@@ -221,3 +221,9 @@ pushしたうえで次の2つのTODOを依頼したが、未完了TODOは環境A
 
 ### Codex回答
 `AGENTS.md` に実学習向けTODOを8項目追加し、学習ライブラリは Gymnasium、Stable-Baselines3、sb3-contrib MaskablePPO を初期候補にした。`docs/training-library-selection.md` に理由と依存関係を記録し、`src/yellowstone/gym_env.py` に `YellowstoneGymEnv` を追加して、既存 `YellowstoneEnv` を Gymnasium の `reset` / `step` / `action_space` / `observation_space` / `action_masks()` へ接続した。
+
+### ユーザー入力
+push後、TODOの未実施上4つを依頼した。
+
+### Codex回答
+前回分を `Gymnasium wrapperと学習ライブラリ選定を追加` としてpushした。続けて、MaskablePPO 用のaction mask接続、観測正規化方針、最小学習スクリプト、学習済みモデル評価スクリプトを追加した。観測は core API では整数tupleを維持し、Gymnasium wrapperではデフォルトで `float32` の0..1正規化配列にする方針にした。
