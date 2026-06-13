@@ -33,7 +33,21 @@ def test_gym_env_reset_and_step_when_dependencies_are_available() -> None:
     step = env.step(action_to_index(action))
 
     assert observation.shape == (OBSERVATION_SIZE,)
+    assert str(observation.dtype) == "float32"
     assert env.action_space.n == ACTION_SPACE_SIZE
+    assert str(env.observation_space.dtype) == "float32"
     assert info["action_mask"].shape == (ACTION_SPACE_SIZE,)
     assert len(step) == 5
     assert env.action_masks().shape == (ACTION_SPACE_SIZE,)
+
+
+def test_gym_env_can_return_raw_integer_observations_when_requested() -> None:
+    # 必要な場合はGymnasium wrapperでも未正規化の整数観測を返せることを確認する。
+    pytest.importorskip("gymnasium")
+    pytest.importorskip("numpy")
+
+    env = YellowstoneGymEnv(normalize_observations=False)
+    observation, _ = env.reset(seed=1)
+
+    assert observation.shape == (OBSERVATION_SIZE,)
+    assert str(observation.dtype) == "int16"

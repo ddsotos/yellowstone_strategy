@@ -7,6 +7,10 @@ from typing import Any
 from yellowstone.action_space import ACTION_SPACE_SIZE, legal_action_mask
 from yellowstone.env import YellowstoneEnv
 from yellowstone.observation import OBSERVATION_SIZE
+from yellowstone.observation_normalization import (
+    normalize_observation,
+    observation_high_values,
+)
 from yellowstone.types import Phase
 
 try:
@@ -32,20 +36,17 @@ class YellowstoneGymEnv(_BaseEnv):
         *,
         player_count: int = 4,
         learning_player_index: int = 0,
+        normalize_observations: bool = True,
     ) -> None:
         _require_gymnasium_dependencies()
         super().__init__()
+        self.normalize_observations = normalize_observations
         self.env = YellowstoneEnv(
             player_count=player_count,
             learning_player_index=learning_player_index,
         )
         self.action_space = spaces.Discrete(ACTION_SPACE_SIZE)
-        self.observation_space = spaces.Box(
-            low=0,
-            high=64,
-            shape=(OBSERVATION_SIZE,),
-            dtype=np.int16,
-        )
+        self.observation_space = _observation_space(normalize_observations)
         self._last_action_mask = np.zeros(ACTION_SPACE_SIZE, dtype=np.bool_)
 
     def reset(
@@ -58,7 +59,10 @@ class YellowstoneGymEnv(_BaseEnv):
         del options
         super().reset(seed=seed)
         result = self.env.reset(seed=seed)
-        observation = _observation_array(result.observation)
+        observation = _observation_array(
+            result.observation,
+            normalize_observations=self.normalize_observations,
+        )
         info = dict(result.info)
         self._last_action_mask = _mask_array(result.legal_action_mask)
         info["action_mask"] = self._last_action_mask
@@ -67,7 +71,10 @@ class YellowstoneGymEnv(_BaseEnv):
     def step(self, action: int) -> tuple[Any, float, bool, bool, dict[str, Any]]:
         """Step using Gymnasium's step signature."""
         result = self.env.step(int(action))
-        observation = _observation_array(result.observation)
+        observation = _observation_array(
+            result.observation,
+            normalize_observations=self.normalize_observations,
+        )
         info = dict(result.info)
         self._last_action_mask = _mask_array(result.legal_action_mask)
         info["action_mask"] = self._last_action_mask
@@ -96,8 +103,30 @@ def _require_gymnasium_dependencies() -> None:
         )
 
 
-def _observation_array(observation: tuple[int, ...]) -> Any:
+def _observation_space(normalize_observations: bool) -> Any:
     _require_gymnasium_dependencies()
+    if normalize_observations:
+        return spaces.Box(
+            low=0.0,
+            high=1.0,
+            shape=(OBSERVATION_SIZE,),
+            dtype=np.float32,
+        )
+    return spaces.Box(
+        low=np.zeros(OBSERVATION_SIZE, dtype=np.int16),
+        high=np.asarray(observation_high_values(), dtype=np.int16),
+        dtype=np.int16,
+    )
+
+
+def _observation_array(
+    observation: tuple[int, ...],
+    *,
+    normalize_observations: bool,
+) -> Any:
+    _require_gymnasium_dependencies()
+    if normalize_observations:
+        return np.asarray(normalize_observation(observation), dtype=np.float32)
     return np.asarray(observation, dtype=np.int16)
 
 
