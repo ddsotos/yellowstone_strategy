@@ -95,6 +95,14 @@ Web UI や見た目の作り込みは優先しない。
 - [x] ランダム bot と heuristic bot の対戦評価 runner を作る。複数 seed の勝率、平均失点、平均ターン数、実行時間を集計できるようにする。
 - [x] 強化学習用の性能ベンチマークを追加する。ログ描画なしで多数ゲームを回し、1ゲームあたりの時間を測れるようにする。
 - [x] 環境API、観測、行動mask、reward、NPC自動進行のテストを追加する。
+- [x] 学習ライブラリを選定する。Gymnasium、Stable-Baselines3、sb3-contrib MaskablePPO を初期候補として採用し、依存関係と理由を文書化する。
+- [x] Gymnasium wrapper を追加する。既存 `YellowstoneEnv` を Gymnasium の `reset` / `step` / `action_space` / `observation_space` 形式へ接続する。
+- [ ] action mask 対応を学習スクリプトへ接続する。`MaskablePPO` が使う `action_masks()` と評価時のmask扱いを検証する。
+- [ ] 観測の正規化方針を決める。現在の固定長整数観測を学習向け `np.ndarray` / tensor に変換し、スケール調整を検討する。
+- [ ] 最小学習スクリプトを追加する。seed、学習ステップ数、保存先、評価間隔を指定して実行できるようにする。
+- [ ] 学習済みモデル評価スクリプトを追加する。学習済みモデル、heuristic bot、random bot を同じ指標で比較する。
+- [ ] モデル保存・再開・評価結果出力を整備する。checkpoint、resume、CSV/JSON出力を扱えるようにする。
+- [ ] reward を実学習で検証する。学習ログと対戦ログを見て、変な行動を覚える場合は reward を調整する。
 
 # Conversation Log
 

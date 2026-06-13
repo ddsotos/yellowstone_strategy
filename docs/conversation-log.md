@@ -215,3 +215,9 @@ pushしたうえで次の2つのTODOを依頼したが、未完了TODOは環境A
 
 ### Codex回答
 既存の単体テストに加えて `tests/test_rl_integration.py` を追加し、`YellowstoneEnv.reset/step` を通した観測、合法手mask、reward、NPC自動進行、ゲーム終了後step拒否の統合確認を追加した。これにより強化学習前TODOはすべて完了扱いにした。
+
+### ユーザー入力
+実際に強化学習を回すまでに必要な8項目をTODOに追加し、そのうち1つ目の学習ライブラリ選定と2つ目のGymnasium wrapper追加を依頼した。
+
+### Codex回答
+`AGENTS.md` に実学習向けTODOを8項目追加し、学習ライブラリは Gymnasium、Stable-Baselines3、sb3-contrib MaskablePPO を初期候補にした。`docs/training-library-selection.md` に理由と依存関係を記録し、`src/yellowstone/gym_env.py` に `YellowstoneGymEnv` を追加して、既存 `YellowstoneEnv` を Gymnasium の `reset` / `step` / `action_space` / `observation_space` / `action_masks()` へ接続した。
