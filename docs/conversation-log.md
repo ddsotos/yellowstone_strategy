@@ -173,3 +173,9 @@ push を依頼し、強化学習を行うまでに必要なことを TODO に書
 
 ### Codex回答
 高速化作業をコミットした後、`AGENTS.md` の Current TODO に、強化学習前提の環境API、状態・行動シリアライズ、観測表現、固定行動空間、reward設計、学習対象1人対heuristic bot 3人の環境、評価runner、性能ベンチ、環境APIテストを追加した。
+
+### ユーザー入力
+TODOの上2つ、強化学習前提の環境API設計と、状態・行動シリアライズ実装を依頼した。
+
+### Codex回答
+`docs/rl-environment-design.md` を追加し、`reset(seed)`、`step(action_index)`、`observation`、`legal_action_mask`、`reward`、`done`、`info`、NPC自動進行、乱数管理の方針を整理した。`src/yellowstone/serialization.py` を追加し、`GameState`、盤面、カード、プレイヤー状態、各Action、合法手一覧をJSON互換dictへ変換・復元できるようにした。
