@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import replace
+from functools import cache
 from random import Random
 from typing import Iterable
 
@@ -78,6 +79,7 @@ def create_initial_state(
     )
 
 
+@cache
 def all_frames() -> tuple[Frame, ...]:
     """Return all valid 3x3 frames."""
     return tuple(
@@ -87,6 +89,7 @@ def all_frames() -> tuple[Frame, ...]:
     )
 
 
+@cache
 def frame_positions(frame: Frame) -> frozenset[Position]:
     """Return positions inside a valid 3x3 frame."""
     if not is_valid_frame(frame):
@@ -111,6 +114,7 @@ def is_valid_frame(frame: Frame) -> bool:
     )
 
 
+@cache
 def frames_containing(position: Position) -> tuple[Frame, ...]:
     """Return valid frames that contain a position."""
     if not is_valid_position(position):
