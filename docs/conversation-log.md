@@ -185,3 +185,9 @@ TODOの上2つ、強化学習前提の環境API設計と、状態・行動シリ
 
 ### Codex回答
 `docs/observation-action-space.md`、`src/yellowstone/observation.py`、`src/yellowstone/action_space.py` を追加した。観測は盤面、現在手札、プレイヤー概要、現在プレイヤー、フェーズ、スカラーを含む固定長 `tuple[int, ...]` とし、行動空間は配置1050、ターン終了1、補充3の固定長1054 index と合法手 mask にした。
+
+### ユーザー入力
+pushしたうえで、次の2つのTODO、学習用reward設計と、学習対象1人対heuristic bot 3人の環境作成を依頼した。まずreward設計に対応した。
+
+### Codex回答
+前回分をTODO単位でコミットしてpushした後、`docs/reward-design.md` と `src/yellowstone/rewards.py` を追加し、失点チャート変化、マイナスカード増減、終端勝敗rewardを組み合わせたbaseline rewardを定義した。
