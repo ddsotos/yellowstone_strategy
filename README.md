@@ -12,3 +12,5 @@ python -m pip install -e ".[dev]"
 pytest
 python -m yellowstone.cli
 ```
+
+CLI の詳しい使い方は [docs/cli.md](docs/cli.md) を参照。
