@@ -86,6 +86,15 @@ Web UI や見た目の作り込みは優先しない。
 - [x] `src/yellowstone/render.py` にテキスト盤面表示を作る。
 - [x] `pytest` の最小テストを追加する。
 - [x] `docs/heuristic-bot-design.md` をもとに、`src/yellowstone/bots.py` に deterministic heuristic bot を実装する。
+- [ ] 強化学習前提の環境APIを設計する。`reset(seed)`, `step(action)`, `legal_action_mask`, `observation`, `reward`, `done`, `info` の形を決める。
+- [ ] 状態と行動のシリアライズを実装する。`GameState`、カード、盤面、合法手を JSON 変換しやすい形式へ変換できるようにする。
+- [ ] 観測表現を設計・実装する。盤面、手札、マイナスカード枚数、失点チャート、現在プレイヤー、フェーズを固定長の数値表現にする。
+- [ ] 行動空間を設計・実装する。配置、ターン終了、補充を固定 index に対応させ、合法手 mask と相互変換できるようにする。
+- [ ] 学習用 reward を設計する。即時報酬、失点チャート変化、マイナスカード増減、最終勝敗報酬の扱いを文書化する。
+- [ ] 学習対象1人対 heuristic bot 3人の環境を作る。学習対象プレイヤーの手番だけを外部 action にし、NPC手番は自動で進める。
+- [ ] ランダム bot と heuristic bot の対戦評価 runner を作る。複数 seed の勝率、平均失点、平均ターン数、実行時間を集計できるようにする。
+- [ ] 強化学習用の性能ベンチマークを追加する。ログ描画なしで多数ゲームを回し、1ゲームあたりの時間を測れるようにする。
+- [ ] 環境API、観測、行動mask、reward、NPC自動進行のテストを追加する。
 
 # Conversation Log
 
