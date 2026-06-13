@@ -64,7 +64,37 @@ active, hand_count, negative_card_count, loss_score
 - フェーズ: `play`, `refill`, `game_over` の one-hot
 - スカラー: `cards_played_this_turn`, `deck_count`, `settlement_count`, `player_count`
 
-## Action Space
+## Turn-Level Action Space
+
+現在の学習では、配置座標や3x3枠を直接学習対象にしない。
+学習対象は「手札のどのスロットを使うか」だけを選び、実際の配置と補充は heuristic に従って決める。
+
+実装は `src/yellowstone/turn_action_space.py` と `src/yellowstone/turn_env.py` に置く。
+
+入口:
+
+```python
+turn_action_to_index(action: TurnAction) -> int
+turn_action_from_index(index: int) -> TurnAction
+resolve_turn_action(state: GameState, index: int) -> tuple[Action, ...]
+legal_turn_action_indices(state: GameState) -> tuple[int, ...]
+legal_turn_action_mask(state: GameState) -> tuple[bool, ...]
+```
+
+手札が6枚ある標準状態では、turn-level action は36通り。
+
+1. 1枚プレイ: `6` 通り。手札スロット `0..5` のどれを1枚だけ使うか。
+2. 2枚プレイ: `6 * 5 = 30` 通り。1枚目と2枚目に使う元の手札スロットの順序付きペア。
+
+2枚プレイでは、1枚目を置いた後に手札indexが詰まる。
+そのため2枚目は、手番開始時点の元スロットを基準に指定し、実行時に現在の手札indexへ変換する。
+
+選ばれたカードの置き場所、3x3枠、補充元は、既存の heuristic 評価で決める。
+これにより、初期学習では「何を出すか」に集中し、「どう置くか」はその場の失点を抑える既存ルールに寄せる。
+
+## Low-Level Action Space
+
+低レベル action space は、配置座標や3x3枠も含めて直接学習するための互換APIとして残す。
 
 実装は `src/yellowstone/action_space.py` に置く。
 

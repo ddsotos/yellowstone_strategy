@@ -1,8 +1,9 @@
 import pytest
 
 from yellowstone.action_space import ACTION_SPACE_SIZE
-from yellowstone.gym_env import YellowstoneGymEnv, gymnasium_available
+from yellowstone.gym_env import YellowstoneGymEnv, YellowstoneTurnGymEnv, gymnasium_available
 from yellowstone.observation import OBSERVATION_SIZE
+from yellowstone.turn_action_space import TURN_ACTION_SPACE_SIZE
 
 
 def test_gym_env_reports_missing_optional_dependencies() -> None:
@@ -51,3 +52,17 @@ def test_gym_env_can_return_raw_integer_observations_when_requested() -> None:
 
     assert observation.shape == (OBSERVATION_SIZE,)
     assert str(observation.dtype) == "int16"
+
+
+def test_turn_gym_env_uses_turn_action_space_when_dependencies_are_available() -> None:
+    # turn-level Gymnasium wrapperが36通りの行動空間とmaskを返すことを確認する。
+    pytest.importorskip("gymnasium")
+    pytest.importorskip("numpy")
+
+    env = YellowstoneTurnGymEnv()
+    observation, info = env.reset(seed=1)
+
+    assert observation.shape == (OBSERVATION_SIZE,)
+    assert env.action_space.n == TURN_ACTION_SPACE_SIZE
+    assert info["action_mask"].shape == (TURN_ACTION_SPACE_SIZE,)
+    assert env.action_masks().shape == (TURN_ACTION_SPACE_SIZE,)

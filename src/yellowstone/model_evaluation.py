@@ -9,7 +9,6 @@ from dataclasses import asdict
 from dataclasses import dataclass
 from pathlib import Path
 
-from yellowstone.action_space import action_from_index, legal_action_mask
 from yellowstone.bots import BotPolicy, HeuristicBot
 from yellowstone.evaluation import (
     EvaluationSummary,
@@ -20,6 +19,7 @@ from yellowstone.evaluation import (
 from yellowstone.gym_env import gymnasium_available
 from yellowstone.observation import state_to_observation
 from yellowstone.observation_normalization import normalize_observation
+from yellowstone.turn_action_space import legal_turn_action_mask, resolve_turn_action
 from yellowstone.types import Action, GameState
 
 try:
@@ -39,16 +39,22 @@ class ModelEvaluationResult:
     random_only: EvaluationSummary
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(slots=True)
 class LearnedModelBot:
-    """BotPolicy adapter for a MaskablePPO model."""
+    """BotPolicy adapter for a turn-level MaskablePPO model."""
 
     model: object
     deterministic: bool = True
+    pending_actions: tuple[Action, ...] = ()
 
     def choose_action(self, state: GameState) -> Action | None:
-        """Choose a legal action using the trained model and action mask."""
-        mask = legal_action_mask(state)
+        """Choose the next low-level action from a learned turn plan."""
+        if self.pending_actions:
+            action = self.pending_actions[0]
+            self.pending_actions = self.pending_actions[1:]
+            return action
+
+        mask = legal_turn_action_mask(state)
         if not any(mask):
             return None
         observation = np.asarray(
@@ -60,7 +66,11 @@ class LearnedModelBot:
             deterministic=self.deterministic,
             action_masks=np.asarray(mask, dtype=np.bool_),
         )
-        return action_from_index(int(action_index), state)
+        actions = resolve_turn_action(state, int(action_index))
+        if not actions:
+            return None
+        self.pending_actions = actions[1:]
+        return actions[0]
 
 
 def evaluate_model(

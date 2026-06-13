@@ -11,6 +11,8 @@ from yellowstone.observation_normalization import (
     normalize_observation,
     observation_high_values,
 )
+from yellowstone.turn_action_space import TURN_ACTION_SPACE_SIZE, legal_turn_action_mask
+from yellowstone.turn_env import YellowstoneTurnEnv
 from yellowstone.types import Phase
 
 try:
@@ -87,6 +89,70 @@ class YellowstoneGymEnv(_BaseEnv):
         if self.env.state is None:
             return self._last_action_mask
         self._last_action_mask = _mask_array(legal_action_mask(self.env.state))
+        return self._last_action_mask
+
+
+class YellowstoneTurnGymEnv(_BaseEnv):
+    """Gymnasium wrapper for turn-level learning actions."""
+
+    metadata = {"render_modes": []}
+
+    def __init__(
+        self,
+        *,
+        player_count: int = 4,
+        learning_player_index: int = 0,
+        normalize_observations: bool = True,
+    ) -> None:
+        _require_gymnasium_dependencies()
+        super().__init__()
+        self.normalize_observations = normalize_observations
+        self.env = YellowstoneTurnEnv(
+            player_count=player_count,
+            learning_player_index=learning_player_index,
+        )
+        self.action_space = spaces.Discrete(TURN_ACTION_SPACE_SIZE)
+        self.observation_space = _observation_space(normalize_observations)
+        self._last_action_mask = np.zeros(TURN_ACTION_SPACE_SIZE, dtype=np.bool_)
+
+    def reset(
+        self,
+        *,
+        seed: int | None = None,
+        options: dict[str, Any] | None = None,
+    ) -> tuple[Any, dict[str, Any]]:
+        """Reset using Gymnasium's reset signature."""
+        del options
+        super().reset(seed=seed)
+        result = self.env.reset(seed=seed)
+        observation = _observation_array(
+            result.observation,
+            normalize_observations=self.normalize_observations,
+        )
+        info = dict(result.info)
+        self._last_action_mask = _mask_array(result.legal_action_mask)
+        info["action_mask"] = self._last_action_mask
+        return observation, info
+
+    def step(self, action: int) -> tuple[Any, float, bool, bool, dict[str, Any]]:
+        """Step using Gymnasium's step signature."""
+        result = self.env.step(int(action))
+        observation = _observation_array(
+            result.observation,
+            normalize_observations=self.normalize_observations,
+        )
+        info = dict(result.info)
+        self._last_action_mask = _mask_array(result.legal_action_mask)
+        info["action_mask"] = self._last_action_mask
+        terminated = self.env.state is not None and self.env.state.phase == Phase.GAME_OVER
+        truncated = bool(result.done and not terminated)
+        return observation, result.reward, terminated, truncated, info
+
+    def action_masks(self) -> Any:
+        """Return legal turn-action masks for sb3-contrib MaskablePPO."""
+        if self.env.state is None:
+            return self._last_action_mask
+        self._last_action_mask = _mask_array(legal_turn_action_mask(self.env.state))
         return self._last_action_mask
 
 

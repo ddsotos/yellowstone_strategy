@@ -9,7 +9,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from yellowstone.gym_env import YellowstoneGymEnv, gymnasium_available
+from yellowstone.gym_env import YellowstoneTurnGymEnv, gymnasium_available
 
 try:
     from sb3_contrib import MaskablePPO
@@ -53,8 +53,8 @@ def train_maskable_ppo(config: TrainingConfig) -> Path:
     config.log_dir.mkdir(parents=True, exist_ok=True)
     config.checkpoint_dir.mkdir(parents=True, exist_ok=True)
 
-    env = YellowstoneGymEnv(normalize_observations=True)
-    eval_env = YellowstoneGymEnv(normalize_observations=True)
+    env = YellowstoneTurnGymEnv(normalize_observations=True)
+    eval_env = YellowstoneTurnGymEnv(normalize_observations=True)
     callback = _make_callbacks(config, eval_env)
     model = _make_or_load_model(config, env)
     model.learn(
@@ -102,7 +102,7 @@ def write_training_report(
     return config.report_path
 
 
-def _make_or_load_model(config: TrainingConfig, env: YellowstoneGymEnv) -> Any:
+def _make_or_load_model(config: TrainingConfig, env: YellowstoneTurnGymEnv) -> Any:
     if config.resume_from is not None:
         model = MaskablePPO.load(config.resume_from)
         model.set_env(env)
@@ -117,7 +117,7 @@ def _make_or_load_model(config: TrainingConfig, env: YellowstoneGymEnv) -> Any:
     )
 
 
-def _make_callbacks(config: TrainingConfig, eval_env: YellowstoneGymEnv) -> Any:
+def _make_callbacks(config: TrainingConfig, eval_env: YellowstoneTurnGymEnv) -> Any:
     callbacks: list[Any] = []
     if config.eval_freq > 0:
         best_model_dir = config.output_path.parent / "best"
