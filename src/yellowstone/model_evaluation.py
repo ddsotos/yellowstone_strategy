@@ -3,6 +3,9 @@
 from __future__ import annotations
 
 import argparse
+import csv
+import json
+from dataclasses import asdict
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -94,6 +97,60 @@ def evaluate_model(
     )
 
 
+def evaluation_summary_to_dict(summary: EvaluationSummary) -> dict[str, object]:
+    """Convert an EvaluationSummary into JSON-friendly data."""
+    return asdict(summary)
+
+
+def model_evaluation_result_to_dict(
+    result: ModelEvaluationResult,
+) -> dict[str, dict[str, object]]:
+    """Convert model evaluation summaries into JSON-friendly data."""
+    return {
+        "model_vs_heuristic": evaluation_summary_to_dict(result.model_vs_heuristic),
+        "heuristic_only": evaluation_summary_to_dict(result.heuristic_only),
+        "random_only": evaluation_summary_to_dict(result.random_only),
+    }
+
+
+def write_model_evaluation_result(
+    result: ModelEvaluationResult,
+    *,
+    json_output: Path | None = None,
+    csv_output: Path | None = None,
+) -> None:
+    """Write evaluation results as JSON and/or CSV."""
+    if json_output is not None:
+        json_output.parent.mkdir(parents=True, exist_ok=True)
+        json_output.write_text(
+            json.dumps(
+                model_evaluation_result_to_dict(result),
+                ensure_ascii=False,
+                indent=2,
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+    if csv_output is not None:
+        csv_output.parent.mkdir(parents=True, exist_ok=True)
+        with csv_output.open("w", newline="", encoding="utf-8") as file:
+            writer = csv.DictWriter(
+                file,
+                fieldnames=[
+                    "scenario",
+                    "match_count",
+                    "win_rates",
+                    "average_loss_scores",
+                    "average_turn_count",
+                    "total_elapsed_seconds",
+                    "average_elapsed_seconds",
+                ],
+            )
+            writer.writeheader()
+            for scenario, summary in model_evaluation_result_to_dict(result).items():
+                writer.writerow({"scenario": scenario, **summary})
+
+
 def model_evaluation_dependencies_available() -> bool:
     """Return whether optional model evaluation dependencies are importable."""
     return gymnasium_available() and np is not None and MaskablePPO is not None
@@ -107,15 +164,17 @@ def _require_model_evaluation_dependencies() -> None:
         )
 
 
-def _parse_args() -> tuple[Path, tuple[int, ...], bool]:
+def _parse_args() -> tuple[Path, tuple[int, ...], bool, Path | None, Path | None]:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("model_path", type=Path)
     parser.add_argument("--seed-start", type=int, default=0)
     parser.add_argument("--games", type=int, default=20)
     parser.add_argument("--stochastic", action="store_true")
+    parser.add_argument("--json-output", type=Path, default=None)
+    parser.add_argument("--csv-output", type=Path, default=None)
     args = parser.parse_args()
     seeds = tuple(range(args.seed_start, args.seed_start + args.games))
-    return args.model_path, seeds, not args.stochastic
+    return args.model_path, seeds, not args.stochastic, args.json_output, args.csv_output
 
 
 def _format_summary(name: str, summary: EvaluationSummary) -> str:
@@ -129,11 +188,16 @@ def _format_summary(name: str, summary: EvaluationSummary) -> str:
 
 def main() -> None:
     """Evaluate a saved model from command-line arguments."""
-    model_path, seeds, deterministic = _parse_args()
+    model_path, seeds, deterministic, json_output, csv_output = _parse_args()
     result = evaluate_model(
         model_path,
         seeds=seeds,
         deterministic=deterministic,
+    )
+    write_model_evaluation_result(
+        result,
+        json_output=json_output,
+        csv_output=csv_output,
     )
     print(_format_summary("model_vs_heuristic", result.model_vs_heuristic))
     print(_format_summary("heuristic_only", result.heuristic_only))
