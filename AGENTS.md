@@ -85,7 +85,7 @@ Web UI や見た目の作り込みは優先しない。
 - [x] `src/yellowstone/game.py` に初期化、合法手生成、状態遷移の最小実装を作る。
 - [x] `src/yellowstone/render.py` にテキスト盤面表示を作る。
 - [x] `pytest` の最小テストを追加する。
-- `docs/heuristic-bot-design.md` をもとに、`src/yellowstone/bots.py` に deterministic heuristic bot を実装する。
+- [x] `docs/heuristic-bot-design.md` をもとに、`src/yellowstone/bots.py` に deterministic heuristic bot を実装する。
 
 # Conversation Log
 
