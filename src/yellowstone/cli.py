@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from random import Random
 
 from yellowstone.bots import BotPolicy, HeuristicBot
-from yellowstone.game import apply_action, create_initial_state
+from yellowstone.game import apply_known_legal_action, create_initial_state
 from yellowstone.render import render_board, render_card, render_player_summary
 from yellowstone.types import (
     Action,
@@ -116,7 +116,7 @@ def play_current_player_turn(
             break
 
         actions.append(render_action(state, action))
-        state = apply_action(state, action, rng=rng)
+        state = apply_known_legal_action(state, action, rng=rng)
         if state.current_player_index != acting_player:
             break
 

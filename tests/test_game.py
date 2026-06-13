@@ -4,6 +4,7 @@ import pytest
 
 from yellowstone.game import (
     apply_action,
+    apply_known_legal_action,
     board_fits_in_some_frame,
     can_place_card_at,
     create_deck,
@@ -97,6 +98,27 @@ def test_apply_place_card_stacks_without_increasing_occupied_cells() -> None:
     assert next_state.board[Position(3, 2)] == (Card(Color.RED, 2), red_three)
     assert len(next_state.board) == 1
     assert next_state.players[0].loss_score == 5
+
+
+def test_apply_known_legal_action_matches_apply_action_for_legal_action() -> None:
+    # 検証済み合法手用の高速適用が通常適用と同じ結果になることを確認する。
+    state = GameState(
+        players=(
+            PlayerState(hand=(Card(Color.RED, 0),)),
+            PlayerState(),
+            PlayerState(),
+            PlayerState(),
+        ),
+        board={},
+        deck=(),
+    )
+    action = PlaceCardAction(
+        hand_index=0,
+        position=Position(0, 0),
+        frame=Frame(0, 0),
+    )
+
+    assert apply_known_legal_action(state, action) == apply_action(state, action)
 
 
 def test_end_turn_advances_after_one_card() -> None:

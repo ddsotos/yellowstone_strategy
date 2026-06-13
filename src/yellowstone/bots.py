@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Protocol
 
-from yellowstone.game import apply_action, legal_actions
+from yellowstone.game import frame_positions, legal_actions, occupied_count_in_frame
 from yellowstone.types import (
     Action,
     Board,
@@ -39,7 +39,6 @@ class HeuristicBot:
 @dataclass(frozen=True, slots=True)
 class _PlacementCandidate:
     action: PlaceCardAction
-    state_after_action: GameState
     sort_key: tuple[int, ...]
 
 
@@ -61,9 +60,9 @@ def choose_heuristic_action(state: GameState) -> Action | None:
         return end_turn
 
     if state.cards_played_this_turn == 0:
-        no_damage_pair = _choose_no_damage_pair(state, place_actions)
-        if no_damage_pair is not None:
-            return no_damage_pair[0]
+        no_damage_first = _choose_no_damage_first_action(state, place_actions)
+        if no_damage_first is not None:
+            return no_damage_first
         return min(place_actions, key=lambda action: placement_sort_key(state, action))
 
     no_damage_second = _no_damage_candidates(
@@ -90,19 +89,11 @@ def placement_sort_key(state: GameState, action: PlaceCardAction) -> tuple[int, 
 
     Smaller tuples are better. The order mirrors docs/heuristic-bot-design.md.
     """
-    return _placement_sort_key_from_state(state, action, apply_action(state, action))
-
-
-def _placement_sort_key_from_state(
-    state: GameState,
-    action: PlaceCardAction,
-    state_after_action: GameState,
-) -> tuple[int, ...]:
     player = state.players[state.current_player_index]
     card = player.hand[action.hand_index]
     return (
-        _negative_card_delta_from_state(state, state_after_action),
-        -_loss_score_delta_from_state(state, state_after_action),
+        _negative_card_delta(state, action),
+        -_loss_score_delta(state, action),
         -abs(card.rank_index - 3),
         0 if action.position in state.board else 1,
         -_same_color_remaining_count(player.hand, action.hand_index, card.color),
@@ -127,42 +118,18 @@ def _choose_refill_action(state: GameState, actions: tuple[Action, ...]) -> Acti
     return min(actions, key=_action_tie_break_key)
 
 
-def _choose_no_damage_pair(
+def _choose_no_damage_first_action(
     state: GameState,
     first_actions: tuple[PlaceCardAction, ...],
-) -> tuple[PlaceCardAction, PlaceCardAction] | None:
-    current_negative_count = _player_negative_count(state)
+) -> PlaceCardAction | None:
     first_candidates = _no_damage_candidates(
         state,
         first_actions,
-        current_negative_count,
+        _player_negative_count(state),
     )
-
-    pairs: list[tuple[_PlacementCandidate, _PlacementCandidate]] = []
-    for first_candidate in first_candidates:
-        second_actions = _place_actions(legal_actions(first_candidate.state_after_action))
-        second_candidates = _no_damage_candidates(
-            first_candidate.state_after_action,
-            second_actions,
-            current_negative_count,
-        )
-        for second_candidate in second_candidates:
-            pairs.append((first_candidate, second_candidate))
-    if not pairs:
+    if not first_candidates:
         return None
-
-    def pair_key(
-        pair: tuple[_PlacementCandidate, _PlacementCandidate],
-    ) -> tuple[tuple[int, ...], tuple[int, ...], tuple[int, ...], tuple[int, ...]]:
-        first_candidate, second_candidate = pair
-        first_key = first_candidate.sort_key
-        second_key = second_candidate.sort_key
-        primary_key = min(first_key, second_key)
-        secondary_key = second_key if primary_key == first_key else first_key
-        return (primary_key, secondary_key, first_key, second_key)
-
-    best_first, best_second = min(pairs, key=pair_key)
-    return (best_first.action, best_second.action)
+    return min(first_candidates, key=lambda candidate: candidate.sort_key).action
 
 
 def _no_damage_candidates(
@@ -172,42 +139,40 @@ def _no_damage_candidates(
 ) -> tuple[_PlacementCandidate, ...]:
     candidates: list[_PlacementCandidate] = []
     for action in actions:
-        next_state = apply_action(state, action)
-        if _player_negative_count(next_state) != target_negative_count:
+        negative_count_after_action = (
+            _player_negative_count(state) + _negative_card_delta(state, action)
+        )
+        if negative_count_after_action != target_negative_count:
             continue
         candidates.append(
             _PlacementCandidate(
                 action=action,
-                state_after_action=next_state,
-                sort_key=_placement_sort_key_from_state(state, action, next_state),
+                sort_key=placement_sort_key(state, action),
             )
         )
     return tuple(candidates)
 
 
 def _negative_card_delta(state: GameState, action: PlaceCardAction) -> int:
-    return _negative_card_delta_from_state(state, apply_action(state, action))
+    frame_cells = frame_positions(action.frame)
+    return sum(
+        len(stack)
+        for position, stack in state.board.items()
+        if position not in frame_cells
+    )
 
 
 def _loss_score_delta(state: GameState, action: PlaceCardAction) -> int:
-    return _loss_score_delta_from_state(state, apply_action(state, action))
-
-
-def _negative_card_delta_from_state(
-    state: GameState,
-    state_after_action: GameState,
-) -> int:
-    return _player_negative_count(state_after_action) - _player_negative_count(state)
-
-
-def _loss_score_delta_from_state(
-    state: GameState,
-    state_after_action: GameState,
-) -> int:
-    player_index = state.current_player_index
-    before = state.players[player_index].loss_score
-    after = state_after_action.players[player_index].loss_score
-    return before - after
+    occupied_before = occupied_count_in_frame(state.board, action.frame)
+    was_occupied = action.position in state.board
+    occupied_after = occupied_before if was_occupied else occupied_before + 1
+    if was_occupied:
+        return 0
+    if occupied_before < 8 <= occupied_after:
+        return 1
+    if occupied_before < 9 <= occupied_after:
+        return 3
+    return 0
 
 
 def _player_negative_count(state: GameState) -> int:

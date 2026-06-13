@@ -187,6 +187,16 @@ def apply_action(state: GameState, action: Action, *, rng: Random | None = None)
     """Apply a legal action and return a new state."""
     if action not in legal_actions(state):
         raise InvalidActionError(f"illegal action: {action}")
+    return apply_known_legal_action(state, action, rng=rng)
+
+
+def apply_known_legal_action(
+    state: GameState,
+    action: Action,
+    *,
+    rng: Random | None = None,
+) -> GameState:
+    """Apply an already validated legal action and return a new state."""
     if isinstance(action, PlaceCardAction):
         return _apply_place_card(state, action)
     if isinstance(action, EndTurnAction):
