@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from random import Random
 from typing import Protocol
 
 from yellowstone.game import frame_positions, legal_actions, occupied_count_in_frame
@@ -34,6 +35,20 @@ class HeuristicBot:
     def choose_action(self, state: GameState) -> Action | None:
         """Choose an action using the documented heuristic rules."""
         return choose_heuristic_action(state)
+
+
+@dataclass(slots=True)
+class RandomBot:
+    """Random policy for baseline evaluation."""
+
+    rng: Random = field(default_factory=Random)
+
+    def choose_action(self, state: GameState) -> Action | None:
+        """Choose a random legal action."""
+        actions = legal_actions(state)
+        if not actions:
+            return None
+        return self.rng.choice(actions)
 
 
 @dataclass(frozen=True, slots=True)
