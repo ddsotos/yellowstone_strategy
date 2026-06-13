@@ -11,3 +11,7 @@ venv/
 build/
 dist/
 *.egg-info/
+
+# Reinforcement-learning generated artifacts.
+models/
+runs/
