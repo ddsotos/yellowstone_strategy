@@ -35,14 +35,15 @@ class ScriptedBot:
 
 
 def test_play_current_player_turn_stops_at_next_player() -> None:
-    # 1回のEnterで現在プレイヤーの手番だけをまとめて進めることを確認する。
+    # 1回のEnterで終了後の補充まで含めて現在プレイヤーの手番を進めることを確認する。
     state = GameState(
         players=(
             PlayerState(hand=(Card(Color.RED, 0),)),
             PlayerState(),
             PlayerState(),
             PlayerState(),
-        )
+        ),
+        deck=tuple(Card(Color.BLUE, rank_index) for rank_index in range(6)),
     )
     bot = ScriptedBot(
         [
@@ -52,6 +53,7 @@ def test_play_current_player_turn_stops_at_next_player() -> None:
                 frame=Frame(0, 0),
             ),
             EndTurnAction(),
+            RefillAction(RefillSource.DECK),
         ]
     )
 
@@ -61,18 +63,20 @@ def test_play_current_player_turn_stops_at_next_player() -> None:
     assert actions == (
         "place hand[0]=R1 at (0,0) frame=(0,0)",
         "end turn after one card",
+        "refill source=deck",
     )
 
 
 def test_create_game_log_records_completed_turns() -> None:
-    # 先にゲームを進めてから閲覧用の手番ログを作れることを確認する。
+    # 補充まで含めて先にゲームを進め、閲覧用の手番ログを作れることを確認する。
     state = GameState(
         players=(
             PlayerState(hand=(Card(Color.RED, 0),)),
             PlayerState(),
             PlayerState(),
             PlayerState(),
-        )
+        ),
+        deck=tuple(Card(Color.BLUE, rank_index) for rank_index in range(6)),
     )
     bot = ScriptedBot(
         [
@@ -82,6 +86,7 @@ def test_create_game_log_records_completed_turns() -> None:
                 frame=Frame(0, 0),
             ),
             EndTurnAction(),
+            RefillAction(RefillSource.DECK),
         ]
     )
 
@@ -94,6 +99,7 @@ def test_create_game_log_records_completed_turns() -> None:
     assert logs[0].actions == (
         "place hand[0]=R1 at (0,0) frame=(0,0)",
         "end turn after one card",
+        "refill source=deck",
     )
     assert "phase=play current=P1" in logs[0].observation_after_turn
 

@@ -200,7 +200,7 @@ def apply_known_legal_action(
     if isinstance(action, PlaceCardAction):
         return _apply_place_card(state, action)
     if isinstance(action, EndTurnAction):
-        return _advance_to_next_player(state)
+        return _apply_end_turn(state)
     if isinstance(action, RefillAction):
         return _apply_refill(state, action, rng=rng)
     raise InvalidActionError(f"unknown action: {action}")
@@ -374,6 +374,13 @@ def _legal_refill_actions(state: GameState) -> tuple[Action, ...]:
     if len(player.negative_cards) >= HAND_SIZE:
         actions.append(RefillAction(RefillSource.NEGATIVE_CARDS))
     return tuple(actions)
+
+
+def _apply_end_turn(state: GameState) -> GameState:
+    player = state.players[state.current_player_index]
+    if player.hand:
+        return _advance_to_next_player(state)
+    return replace(state, phase=Phase.REFILL)
 
 
 def _advance_to_next_player(state: GameState) -> GameState:

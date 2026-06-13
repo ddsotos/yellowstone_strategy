@@ -132,6 +132,76 @@ def test_end_turn_advances_after_one_card() -> None:
     assert next_state.phase == Phase.PLAY
 
 
+def test_end_turn_with_empty_hand_requires_refill_before_next_player() -> None:
+    # 1枚配置後に手札が空なら、ターン終了ではなく補充フェーズに入ることを確認する。
+    state = GameState(
+        players=(
+            PlayerState(hand=()),
+            PlayerState(),
+            PlayerState(),
+            PlayerState(),
+        ),
+        deck=tuple(Card(Color.RED, rank_index) for rank_index in range(HAND_SIZE)),
+        cards_played_this_turn=1,
+    )
+
+    next_state = apply_action(state, EndTurnAction())
+
+    assert next_state.current_player_index == 0
+    assert next_state.cards_played_this_turn == 1
+    assert next_state.phase == Phase.REFILL
+    assert RefillAction(RefillSource.DECK) in legal_actions(next_state)
+    assert RefillAction(RefillSource.NONE) not in legal_actions(next_state)
+
+
+def test_refill_after_one_card_empty_hand_advances_after_deck_draw() -> None:
+    # 1枚終了後の補充で山札から手札を戻してから次プレイヤーへ進むことを確認する。
+    state = GameState(
+        players=(
+            PlayerState(hand=()),
+            PlayerState(),
+            PlayerState(),
+            PlayerState(),
+        ),
+        deck=tuple(Card(Color.RED, rank_index) for rank_index in range(HAND_SIZE)),
+        phase=Phase.REFILL,
+        cards_played_this_turn=1,
+    )
+
+    next_state = apply_action(state, RefillAction(RefillSource.DECK))
+
+    assert len(next_state.players[0].hand) == HAND_SIZE
+    assert next_state.current_player_index == 1
+    assert next_state.cards_played_this_turn == 0
+    assert next_state.phase == Phase.PLAY
+
+
+def test_end_turn_with_empty_hand_can_recover_from_negative_cards() -> None:
+    # 手札が空でマイナスカードが6枚以上あれば、失点側からの回復を選べることを確認する。
+    negative_cards = tuple(Card(Color.BLUE, rank_index) for rank_index in range(HAND_SIZE))
+    state = GameState(
+        players=(
+            PlayerState(hand=(), negative_cards=negative_cards),
+            PlayerState(),
+            PlayerState(),
+            PlayerState(),
+        ),
+        deck=tuple(Card(Color.RED, rank_index) for rank_index in range(HAND_SIZE)),
+        cards_played_this_turn=1,
+    )
+
+    refill_state = apply_action(state, EndTurnAction())
+    next_state = apply_action(
+        refill_state,
+        RefillAction(RefillSource.NEGATIVE_CARDS),
+    )
+
+    assert RefillAction(RefillSource.NEGATIVE_CARDS) in legal_actions(refill_state)
+    assert len(next_state.players[0].hand) == HAND_SIZE
+    assert next_state.players[0].negative_cards == ()
+    assert next_state.current_player_index == 1
+
+
 def test_refill_none_advances_after_two_cards() -> None:
     # 2枚配置後の補充しない選択で次プレイヤーへ進むことを確認する。
     state = replace(
