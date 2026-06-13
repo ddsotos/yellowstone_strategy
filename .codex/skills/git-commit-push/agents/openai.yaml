@@ -1,0 +1,4 @@
+interface:
+  display_name: "Git Commit Push"
+  short_description: "TODO単位でコミットし、依頼時にプッシュ"
+  default_prompt: "Use $git-commit-push to split completed TODOs into commits and push when requested."
