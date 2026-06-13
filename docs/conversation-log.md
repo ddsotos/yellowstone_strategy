@@ -227,3 +227,9 @@ push後、TODOの未実施上4つを依頼した。
 
 ### Codex回答
 前回分を `Gymnasium wrapperと学習ライブラリ選定を追加` としてpushした。続けて、MaskablePPO 用のaction mask接続、観測正規化方針、最小学習スクリプト、学習済みモデル評価スクリプトを追加した。観測は core API では整数tupleを維持し、Gymnasium wrapperではデフォルトで `float32` の0..1正規化配列にする方針にした。
+
+### ユーザー入力
+push後、残るTODOの実施と、処理最適化以降ここまでの概要を機械学習初心者にも分かるように別文書へまとめることを依頼した。
+
+### Codex回答
+前回分を3コミットに分けてpushした。残るTODOとして、学習時のcheckpoint保存、保存済みモデルからのresume、学習report、モデル評価のJSON/CSV出力、reward診断を追加した。概要文書として `docs/rl-progress-overview.md` を追加し、処理最適化から学習環境・観測・行動mask・reward・Gymnasium接続・学習/評価入口までを初心者向けに整理した。
