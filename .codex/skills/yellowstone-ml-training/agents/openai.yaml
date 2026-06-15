@@ -1,0 +1,4 @@
+interface:
+  display_name: "Yellowstone ML Training"
+  short_description: "Run Yellowstone RL experiments without wasting partial progress."
+  default_prompt: "Run or evaluate Yellowstone reinforcement learning while preserving checkpoints and fast feedback."
