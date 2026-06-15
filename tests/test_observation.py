@@ -27,8 +27,8 @@ def test_state_to_observation_has_fixed_size() -> None:
     assert observation_metadata()["observation_size"] == OBSERVATION_SIZE
 
 
-def test_state_to_observation_encodes_board_stack_color_counts() -> None:
-    # 盤面セルに重ね置きされたカードの色枚数が入ることを確認する。
+def test_state_to_observation_encodes_compressed_board_features() -> None:
+    # 盤面は3x3枠の基準位置、列ごとの色枚数、セルごとの総枚数として入ることを確認する。
     state = GameState(
         players=(PlayerState(), PlayerState(), PlayerState(), PlayerState()),
         board={
@@ -41,9 +41,32 @@ def test_state_to_observation_encodes_board_stack_color_counts() -> None:
     )
 
     observation = state_to_observation(state)
-    cell_start = ((2 * 7) + 1) * 4
 
-    assert observation[cell_start : cell_start + 4] == (2, 1, 0, 0)
+    assert observation[:BOARD_OBSERVATION_SIZE] == (
+        2,
+        1,
+        2,
+        1,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        3,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+    )
 
 
 def test_state_to_observation_encodes_current_player_hand() -> None:
@@ -66,7 +89,7 @@ def test_state_to_observation_encodes_current_player_hand() -> None:
 
 
 def test_state_to_observation_encodes_player_phase_and_scalars() -> None:
-    # プレイヤー概要、現在プレイヤー、フェーズ、スカラーが入ることを確認する。
+    # プレイヤー状態、現在プレイヤー、フェーズ、スカラー値が入ることを確認する。
     state = GameState(
         players=(
             PlayerState(hand=(Card(Color.RED, 0),), loss_score=5),

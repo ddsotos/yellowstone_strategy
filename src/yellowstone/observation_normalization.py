@@ -3,6 +3,9 @@
 from __future__ import annotations
 
 from yellowstone.observation import (
+    BOARD_ANCHOR_FEATURE_SIZE,
+    BOARD_CELL_COUNT_FEATURE_SIZE,
+    BOARD_COLUMN_COLOR_FEATURE_SIZE,
     BOARD_OBSERVATION_SIZE,
     COLOR_ORDER,
     CURRENT_PLAYER_OBSERVATION_SIZE,
@@ -17,7 +20,6 @@ from yellowstone.observation import (
 from yellowstone.types import BOARD_SIZE, DEFAULT_LOSS_SCORE, HAND_SIZE, MAX_PLAYERS
 
 
-MAX_CARD_COPIES_PER_COLOR = BOARD_SIZE * 2
 MAX_DECK_SIZE = BOARD_SIZE * len(COLOR_ORDER) * 2
 MAX_OBSERVED_LOSS_SCORE = 64
 MAX_SETTLEMENT_COUNT = 64
@@ -26,7 +28,9 @@ MAX_SETTLEMENT_COUNT = 64
 def observation_high_values() -> tuple[int, ...]:
     """Return per-feature upper bounds for raw integer observations."""
     values: list[int] = []
-    values.extend([MAX_CARD_COPIES_PER_COLOR] * BOARD_OBSERVATION_SIZE)
+    values.extend([BOARD_SIZE - 1] * BOARD_ANCHOR_FEATURE_SIZE)
+    values.extend([MAX_DECK_SIZE] * BOARD_COLUMN_COLOR_FEATURE_SIZE)
+    values.extend([MAX_DECK_SIZE] * BOARD_CELL_COUNT_FEATURE_SIZE)
     for _ in range(HAND_SIZE):
         values.append(1)
         values.extend([1] * len(COLOR_ORDER))
@@ -72,7 +76,10 @@ def observation_normalization_policy() -> dict[str, int | str]:
         "core_api": "raw_integer_tuple",
         "gym_api": "float32_normalized_by_default",
         "observation_size": OBSERVATION_SIZE,
-        "board_stack_color_max": MAX_CARD_COPIES_PER_COLOR,
+        "board_observation_size": BOARD_OBSERVATION_SIZE,
+        "board_anchor_max": BOARD_SIZE - 1,
+        "board_column_color_max": MAX_DECK_SIZE,
+        "board_cell_count_max": MAX_DECK_SIZE,
         "deck_size_max": MAX_DECK_SIZE,
         "loss_score_clip_max": MAX_OBSERVED_LOSS_SCORE,
         "initial_loss_score": DEFAULT_LOSS_SCORE,

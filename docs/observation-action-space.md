@@ -15,11 +15,11 @@ state_to_observation(state: GameState) -> tuple[int, ...]
 observation_metadata() -> dict[str, int]
 ```
 
-観測長は `OBSERVATION_SIZE` で固定する。2026-06-13 時点では `264`。
+観測長は `OBSERVATION_SIZE` で固定する。2026-06-15 時点では `91`。
 
 内訳:
 
-1. 盤面: `7 * 7 * 4 = 196`
+1. 盤面: `2 + 3 * 4 + 3 * 3 = 23`
 2. 現在プレイヤーの手札: `6 * 6 = 36`
 3. プレイヤー概要: `5 * 4 = 20`
 4. 現在プレイヤー one-hot: `5`
@@ -28,11 +28,27 @@ observation_metadata() -> dict[str, int]
 
 ### 盤面
 
-各セルを `(red_count, blue_count, green_count, yellow_count)` で表す。
+盤面は、現在置かれているカードがすべて収まる3x3範囲に圧縮して表す。
 
-重ね置きされたカードは stack 内のカードをすべて数える。rank は `y` 座標から分かるため、盤面セルには rank を入れない。
+先頭2値は以下:
 
-走査順は `y=0..6`、各行で `x=0..6`。
+```text
+min_rank_index, min_x
+```
+
+`min_rank_index` は盤面にある中で一番小さい数字に対応する `y`、`min_x` は盤面にある中で一番左の列番号として扱う。この2値から、盤面カードが収まる3x3範囲を決める。盤面が空の場合はどちらも0にする。
+
+続く12値は、3列それぞれの色パターン:
+
+```text
+col0_red, col0_blue, col0_green, col0_yellow,
+col1_red, col1_blue, col1_green, col1_yellow,
+col2_red, col2_blue, col2_green, col2_yellow
+```
+
+最後の9値は、3x3範囲内の各マスにあるカード総数。走査順は `y=min_rank_index..min_rank_index+2`、各行で `x=min_x..min_x+2`。
+
+重ね置きされたカードは、列ごとの色枚数とセルごとの総枚数の両方に反映する。
 
 ### 手札
 
@@ -91,6 +107,10 @@ legal_turn_action_mask(state: GameState) -> tuple[bool, ...]
 
 選ばれたカードの置き場所、3x3枠、補充元は、既存の heuristic 評価で決める。
 これにより、初期学習では「何を出すか」に集中し、「どう置くか」はその場の失点を抑える既存ルールに寄せる。
+
+turn-level の合法手 mask は、配置を実際に解決して検証しない。
+ターン開始時の盤面は3x3枠内に収まっており、失点を許す限り手札カードは配置可能というルール前提に基づき、存在する手札スロットだけを `True` にする。
+2枚プレイも、手番開始時点で存在する異なる2スロットの順序付きペアを合法とする。
 
 ## Low-Level Action Space
 

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from yellowstone.types import (
-    BOARD_SIZE,
+    FRAME_SIZE,
     HAND_SIZE,
     MAX_PLAYERS,
     Card,
@@ -19,7 +19,14 @@ PHASE_ORDER = (Phase.PLAY, Phase.REFILL, Phase.GAME_OVER)
 CELL_FEATURE_SIZE = len(COLOR_ORDER)
 HAND_SLOT_FEATURE_SIZE = 1 + len(COLOR_ORDER) + 1
 PLAYER_FEATURE_SIZE = 4
-BOARD_OBSERVATION_SIZE = BOARD_SIZE * BOARD_SIZE * CELL_FEATURE_SIZE
+BOARD_ANCHOR_FEATURE_SIZE = 2
+BOARD_COLUMN_COLOR_FEATURE_SIZE = FRAME_SIZE * CELL_FEATURE_SIZE
+BOARD_CELL_COUNT_FEATURE_SIZE = FRAME_SIZE * FRAME_SIZE
+BOARD_OBSERVATION_SIZE = (
+    BOARD_ANCHOR_FEATURE_SIZE
+    + BOARD_COLUMN_COLOR_FEATURE_SIZE
+    + BOARD_CELL_COUNT_FEATURE_SIZE
+)
 HAND_OBSERVATION_SIZE = HAND_SIZE * HAND_SLOT_FEATURE_SIZE
 PLAYERS_OBSERVATION_SIZE = MAX_PLAYERS * PLAYER_FEATURE_SIZE
 CURRENT_PLAYER_OBSERVATION_SIZE = MAX_PLAYERS
@@ -70,12 +77,25 @@ def observation_metadata() -> dict[str, int]:
 
 
 def _board_features(state: GameState) -> list[int]:
-    values: list[int] = []
-    for y in range(BOARD_SIZE):
-        for x in range(BOARD_SIZE):
-            stack = state.board.get(Position(x=x, y=y), ())
-            values.extend(_stack_color_counts(stack))
+    anchor = _board_anchor(state)
+    values: list[int] = [anchor.y, anchor.x]
+    for x in range(anchor.x, anchor.x + FRAME_SIZE):
+        column_stack: list[Card] = []
+        for y in range(anchor.y, anchor.y + FRAME_SIZE):
+            column_stack.extend(state.board.get(Position(x=x, y=y), ()))
+        values.extend(_stack_color_counts(tuple(column_stack)))
+    for y in range(anchor.y, anchor.y + FRAME_SIZE):
+        for x in range(anchor.x, anchor.x + FRAME_SIZE):
+            values.append(len(state.board.get(Position(x=x, y=y), ())))
     return values
+
+
+def _board_anchor(state: GameState) -> Position:
+    if not state.board:
+        return Position(x=0, y=0)
+    min_x = min(position.x for position in state.board)
+    min_y = min(position.y for position in state.board)
+    return Position(x=min_x, y=min_y)
 
 
 def _current_hand_features(state: GameState) -> list[int]:
