@@ -15,16 +15,14 @@ state_to_observation(state: GameState) -> tuple[int, ...]
 observation_metadata() -> dict[str, int]
 ```
 
-観測長は `OBSERVATION_SIZE` で固定する。2026-06-15 時点では `79`。
+観測長は `OBSERVATION_SIZE` で固定する。2026-06-15 時点では `61`。
 
 内訳:
 
 1. 盤面: `2 + 3 * 3 = 11`
 2. 現在プレイヤーの手札: `6 * 6 = 36`
-3. プレイヤー概要: `5 * 4 = 20`
-4. 現在プレイヤー one-hot: `5`
-5. フェーズ one-hot: `3`
-6. スカラー: `4`
+3. プレイヤー概要: `4 * 3 = 12`
+4. スカラー: `2`
 
 ### 盤面
 
@@ -58,21 +56,30 @@ present, relative_color_0, relative_color_1, relative_color_2, relative_color_3,
 
 ### プレイヤー概要
 
-最大5人ぶんを固定長で持つ。
+学習環境は4人対戦を前提にし、4人ぶんを固定長で持つ。
 
-各プレイヤーは以下の4値:
+各プレイヤーは以下の3値:
 
 ```text
-active, hand_count, negative_card_count, loss_score
+hand_count, negative_card_count, loss_score
 ```
 
-存在しない5人目はすべて0にする。
+`active` は4人固定では常に1になるため入れない。
 
 ### その他
 
-- 現在プレイヤー: 最大5人の one-hot
-- フェーズ: `play`, `refill`, `game_over` の one-hot
-- スカラー: `cards_played_this_turn`, `deck_count`, `settlement_count`, `player_count`
+- スカラー: `deck_bucket`, `settlement_count`
+
+`deck_bucket` は山札枚数を以下の4段階に丸める。
+
+```text
+0: 山札0枚
+1: 1..6枚
+2: 7..18枚
+3: 19枚以上
+```
+
+turn-level 学習では、学習対象の行動選択時点が現在プレイヤーのプレイフェーズ開始時に揃う。そのため `current_player`、`phase`、`cards_played_this_turn`、`player_count` は入力に入れない。
 
 ## Turn-Level Action Space
 

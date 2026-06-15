@@ -2,6 +2,7 @@ from yellowstone.observation import (
     BOARD_OBSERVATION_SIZE,
     HAND_OBSERVATION_SIZE,
     OBSERVATION_SIZE,
+    PLAYERS_OBSERVATION_SIZE,
     observation_metadata,
     state_to_observation,
 )
@@ -9,7 +10,6 @@ from yellowstone.types import (
     Card,
     Color,
     GameState,
-    Phase,
     PlayerState,
     Position,
 )
@@ -130,35 +130,35 @@ def test_state_to_observation_assigns_unseen_hand_colors_without_absolute_order(
     assert observation[hand_start + 6 : hand_start + 12] == (0, 0, 0, 0, 0, 0)
 
 
-def test_state_to_observation_encodes_player_phase_and_scalars() -> None:
-    # プレイヤー状態、現在プレイヤー、フェーズ、スカラー値が入ることを確認する。
+def test_state_to_observation_encodes_players_and_scalars() -> None:
+    # プレイヤー状態と、山札段階・決算回数だけが末尾に入ることを確認する。
     state = GameState(
         players=(
             PlayerState(hand=(Card(Color.RED, 0),), loss_score=5),
             PlayerState(negative_cards=(Card(Color.BLUE, 1),), loss_score=8),
             PlayerState(),
-            PlayerState(),
+            PlayerState(hand=(Card(Color.GREEN, 1), Card(Color.YELLOW, 2))),
         ),
-        current_player_index=1,
-        phase=Phase.REFILL,
-        cards_played_this_turn=2,
-        deck=(Card(Color.YELLOW, 0), Card(Color.GREEN, 1)),
+        deck=tuple(Card(Color.YELLOW, index % 7) for index in range(7)),
         settlement_count=3,
     )
 
     observation = state_to_observation(state)
     player_start = BOARD_OBSERVATION_SIZE + HAND_OBSERVATION_SIZE
-    current_player_start = player_start + 20
-    phase_start = current_player_start + 5
-    scalar_start = phase_start + 3
+    scalar_start = player_start + PLAYERS_OBSERVATION_SIZE
 
-    assert observation[player_start : player_start + 8] == (1, 1, 0, 5, 1, 0, 1, 8)
-    assert observation[current_player_start : current_player_start + 5] == (
-        0,
+    assert observation[player_start : player_start + 12] == (
         1,
         0,
+        5,
+        0,
+        1,
+        8,
         0,
         0,
+        5,
+        2,
+        0,
+        5,
     )
-    assert observation[phase_start : phase_start + 3] == (0, 1, 0)
-    assert observation[scalar_start : scalar_start + 4] == (2, 2, 3, 4)
+    assert observation[scalar_start : scalar_start + 2] == (2, 3)

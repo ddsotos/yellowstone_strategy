@@ -5,34 +5,28 @@ from __future__ import annotations
 from yellowstone.types import (
     FRAME_SIZE,
     HAND_SIZE,
-    MAX_PLAYERS,
     Card,
     Color,
     GameState,
-    Phase,
     Position,
 )
 
 
 COLOR_ORDER = (Color.RED, Color.BLUE, Color.GREEN, Color.YELLOW)
-PHASE_ORDER = (Phase.PLAY, Phase.REFILL, Phase.GAME_OVER)
 RELATIVE_COLOR_FEATURE_SIZE = len(COLOR_ORDER)
 HAND_SLOT_FEATURE_SIZE = 1 + RELATIVE_COLOR_FEATURE_SIZE + 1
-PLAYER_FEATURE_SIZE = 4
+OBSERVED_PLAYER_COUNT = 4
+PLAYER_FEATURE_SIZE = 3
 BOARD_ANCHOR_FEATURE_SIZE = 2
 BOARD_CELL_COUNT_FEATURE_SIZE = FRAME_SIZE * FRAME_SIZE
 BOARD_OBSERVATION_SIZE = BOARD_ANCHOR_FEATURE_SIZE + BOARD_CELL_COUNT_FEATURE_SIZE
 HAND_OBSERVATION_SIZE = HAND_SIZE * HAND_SLOT_FEATURE_SIZE
-PLAYERS_OBSERVATION_SIZE = MAX_PLAYERS * PLAYER_FEATURE_SIZE
-CURRENT_PLAYER_OBSERVATION_SIZE = MAX_PLAYERS
-PHASE_OBSERVATION_SIZE = len(PHASE_ORDER)
-SCALAR_OBSERVATION_SIZE = 4
+PLAYERS_OBSERVATION_SIZE = OBSERVED_PLAYER_COUNT * PLAYER_FEATURE_SIZE
+SCALAR_OBSERVATION_SIZE = 2
 OBSERVATION_SIZE = (
     BOARD_OBSERVATION_SIZE
     + HAND_OBSERVATION_SIZE
     + PLAYERS_OBSERVATION_SIZE
-    + CURRENT_PLAYER_OBSERVATION_SIZE
-    + PHASE_OBSERVATION_SIZE
     + SCALAR_OBSERVATION_SIZE
 )
 
@@ -43,14 +37,10 @@ def state_to_observation(state: GameState) -> tuple[int, ...]:
     values.extend(_board_features(state))
     values.extend(_current_hand_features(state))
     values.extend(_player_features(state))
-    values.extend(_one_hot(state.current_player_index, MAX_PLAYERS))
-    values.extend(_one_hot(PHASE_ORDER.index(state.phase), len(PHASE_ORDER)))
     values.extend(
         [
-            state.cards_played_this_turn,
-            len(state.deck),
+            _deck_bucket(len(state.deck)),
             state.settlement_count,
-            len(state.players),
         ]
     )
     if len(values) != OBSERVATION_SIZE:
@@ -65,8 +55,6 @@ def observation_metadata() -> dict[str, int]:
         "board_size": BOARD_OBSERVATION_SIZE,
         "hand_size": HAND_OBSERVATION_SIZE,
         "players_size": PLAYERS_OBSERVATION_SIZE,
-        "current_player_size": CURRENT_PLAYER_OBSERVATION_SIZE,
-        "phase_size": PHASE_OBSERVATION_SIZE,
         "scalar_size": SCALAR_OBSERVATION_SIZE,
     }
 
@@ -110,12 +98,11 @@ def _current_hand_features(state: GameState) -> list[int]:
 
 def _player_features(state: GameState) -> list[int]:
     values: list[int] = []
-    for index in range(MAX_PLAYERS):
+    for index in range(OBSERVED_PLAYER_COUNT):
         if index < len(state.players):
             player = state.players[index]
             values.extend(
                 [
-                    1,
                     len(player.hand),
                     len(player.negative_cards),
                     player.loss_score,
@@ -124,6 +111,16 @@ def _player_features(state: GameState) -> list[int]:
         else:
             values.extend([0] * PLAYER_FEATURE_SIZE)
     return values
+
+
+def _deck_bucket(deck_count: int) -> int:
+    if deck_count == 0:
+        return 0
+    if deck_count <= HAND_SIZE:
+        return 1
+    if deck_count <= HAND_SIZE * 3:
+        return 2
+    return 3
 
 
 def _relative_color_indices(state: GameState) -> dict[Color, int]:

@@ -7,21 +7,21 @@ from yellowstone.observation import (
     BOARD_CELL_COUNT_FEATURE_SIZE,
     BOARD_OBSERVATION_SIZE,
     COLOR_ORDER,
-    CURRENT_PLAYER_OBSERVATION_SIZE,
     HAND_OBSERVATION_SIZE,
     HAND_SLOT_FEATURE_SIZE,
     OBSERVATION_SIZE,
-    PHASE_OBSERVATION_SIZE,
+    OBSERVED_PLAYER_COUNT,
     PLAYER_FEATURE_SIZE,
     PLAYERS_OBSERVATION_SIZE,
     SCALAR_OBSERVATION_SIZE,
 )
-from yellowstone.types import BOARD_SIZE, DEFAULT_LOSS_SCORE, HAND_SIZE, MAX_PLAYERS
+from yellowstone.types import BOARD_SIZE, DEFAULT_LOSS_SCORE, HAND_SIZE
 
 
 MAX_DECK_SIZE = BOARD_SIZE * len(COLOR_ORDER) * 2
 MAX_OBSERVED_LOSS_SCORE = 64
 MAX_SETTLEMENT_COUNT = 64
+MAX_DECK_BUCKET = 3
 
 
 def observation_high_values() -> tuple[int, ...]:
@@ -33,23 +33,18 @@ def observation_high_values() -> tuple[int, ...]:
         values.append(1)
         values.extend([1] * len(COLOR_ORDER))
         values.append(BOARD_SIZE - 1)
-    for _ in range(MAX_PLAYERS):
+    for _ in range(OBSERVED_PLAYER_COUNT):
         values.extend(
             [
-                1,
                 HAND_SIZE,
                 MAX_DECK_SIZE,
                 MAX_OBSERVED_LOSS_SCORE,
             ]
         )
-    values.extend([1] * CURRENT_PLAYER_OBSERVATION_SIZE)
-    values.extend([1] * PHASE_OBSERVATION_SIZE)
     values.extend(
         [
-            2,
-            MAX_DECK_SIZE,
+            MAX_DECK_BUCKET,
             MAX_SETTLEMENT_COUNT,
-            MAX_PLAYERS,
         ]
     )
     if len(values) != OBSERVATION_SIZE:
@@ -77,7 +72,7 @@ def observation_normalization_policy() -> dict[str, int | str]:
         "board_observation_size": BOARD_OBSERVATION_SIZE,
         "board_anchor_max": BOARD_SIZE - 1,
         "board_cell_count_max": MAX_DECK_SIZE,
-        "deck_size_max": MAX_DECK_SIZE,
+        "deck_bucket_max": MAX_DECK_BUCKET,
         "loss_score_clip_max": MAX_OBSERVED_LOSS_SCORE,
         "initial_loss_score": DEFAULT_LOSS_SCORE,
         "hand_slot_feature_size": HAND_SLOT_FEATURE_SIZE,
