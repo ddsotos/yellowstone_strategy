@@ -96,13 +96,17 @@ def resolve_turn_action(state: GameState, index: int) -> tuple[Action, ...]:
 
 def legal_turn_action_indices(state: GameState) -> tuple[int, ...]:
     """Return legal turn-level action indexes."""
+    if state.phase != Phase.PLAY or state.cards_played_this_turn != 0:
+        return ()
+
+    hand_count = len(state.players[state.current_player_index].hand)
     indexes: list[int] = []
-    for index in range(TURN_ACTION_SPACE_SIZE):
-        try:
-            resolve_turn_action(state, index)
-        except ValueError:
-            continue
-        indexes.append(index)
+    indexes.extend(range(min(hand_count, HAND_SIZE)))
+    for first_index in range(min(hand_count, HAND_SIZE)):
+        for second_index in range(min(hand_count, HAND_SIZE)):
+            if first_index == second_index:
+                continue
+            indexes.append(turn_action_to_index(TurnAction((first_index, second_index))))
     return tuple(indexes)
 
 

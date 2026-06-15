@@ -1,3 +1,5 @@
+from dataclasses import replace
+
 from yellowstone.game import apply_known_legal_action, create_initial_state, legal_actions
 from yellowstone.turn_action_space import (
     TURN_ACTION_SPACE_SIZE,
@@ -9,7 +11,15 @@ from yellowstone.turn_action_space import (
     turn_action_space_metadata,
     turn_action_to_index,
 )
-from yellowstone.types import EndTurnAction, PlaceCardAction, RefillAction
+from yellowstone.types import (
+    Card,
+    Color,
+    EndTurnAction,
+    Phase,
+    PlaceCardAction,
+    PlayerState,
+    RefillAction,
+)
 
 
 def test_turn_action_space_has_36_actions() -> None:
@@ -57,11 +67,42 @@ def test_resolve_two_card_turn_uses_two_selected_original_slots() -> None:
     assert any(isinstance(action, RefillAction) for action in actions)
 
 
-def test_legal_turn_action_mask_matches_indices() -> None:
-    # turn-level合法手maskのTrue位置が合法index一覧と一致することを確認する。
+def test_legal_turn_action_mask_uses_available_hand_slots() -> None:
+    # turn-level合法手maskが配置検証ではなく手札スロットの存在だけで決まることを確認する。
     state = create_initial_state(4, seed=1)
     indexes = set(legal_turn_action_indices(state))
     mask = legal_turn_action_mask(state)
 
     assert len(mask) == TURN_ACTION_SPACE_SIZE
     assert {index for index, value in enumerate(mask) if value} == indexes
+    assert len(indexes) == 36
+
+
+def test_legal_turn_action_mask_shrinks_with_hand_count() -> None:
+    # 手札が2枚なら1枚プレイ2通りと2枚プレイ2通りだけが合法になることを確認する。
+    state = replace(
+        create_initial_state(4, seed=1),
+        players=(
+            PlayerState(hand=(Card(Color.RED, 0), Card(Color.BLUE, 1))),
+            PlayerState(),
+            PlayerState(),
+            PlayerState(),
+        ),
+    )
+
+    assert legal_turn_action_indices(state) == (
+        turn_action_to_index(TurnAction((0,))),
+        turn_action_to_index(TurnAction((1,))),
+        turn_action_to_index(TurnAction((0, 1))),
+        turn_action_to_index(TurnAction((1, 0))),
+    )
+
+
+def test_legal_turn_action_indices_empty_outside_turn_start() -> None:
+    # turn-level行動はプレイフェーズの手番開始時だけ選ばれることを確認する。
+    state = replace(
+        create_initial_state(4, seed=1),
+        phase=Phase.REFILL,
+    )
+
+    assert legal_turn_action_indices(state) == ()
