@@ -15,11 +15,11 @@ state_to_observation(state: GameState) -> tuple[int, ...]
 observation_metadata() -> dict[str, int]
 ```
 
-観測長は `OBSERVATION_SIZE` で固定する。2026-06-15 時点では `91`。
+観測長は `OBSERVATION_SIZE` で固定する。2026-06-15 時点では `79`。
 
 内訳:
 
-1. 盤面: `2 + 3 * 4 + 3 * 3 = 23`
+1. 盤面: `2 + 3 * 3 = 11`
 2. 現在プレイヤーの手札: `6 * 6 = 36`
 3. プレイヤー概要: `5 * 4 = 20`
 4. 現在プレイヤー one-hot: `5`
@@ -38,17 +38,9 @@ min_rank_index, min_x
 
 `min_rank_index` は盤面にある中で一番小さい数字に対応する `y`、`min_x` は盤面にある中で一番左の列番号として扱う。この2値から、盤面カードが収まる3x3範囲を決める。盤面が空の場合はどちらも0にする。
 
-続く12値は、3列それぞれの色パターン:
+続く9値は、3x3範囲内の各マスにあるカード総数。走査順は `y=min_rank_index..min_rank_index+2`、各行で `x=min_x..min_x+2`。
 
-```text
-col0_red, col0_blue, col0_green, col0_yellow,
-col1_red, col1_blue, col1_green, col1_yellow,
-col2_red, col2_blue, col2_green, col2_yellow
-```
-
-最後の9値は、3x3範囲内の各マスにあるカード総数。走査順は `y=min_rank_index..min_rank_index+2`、各行で `x=min_x..min_x+2`。
-
-重ね置きされたカードは、列ごとの色枚数とセルごとの総枚数の両方に反映する。
+盤面には赤・青・緑・黄という絶対色を入れない。色は手札側で相対色one-hotとして表す。
 
 ### 手札
 
@@ -57,8 +49,10 @@ col2_red, col2_blue, col2_green, col2_yellow
 各スロットは以下の6値:
 
 ```text
-present, red, blue, green, yellow, rank_index
+present, relative_color_0, relative_color_1, relative_color_2, relative_color_3, rank_index
 ```
+
+相対色IDは、盤面3列の色から決める。3x3範囲の右列にある色を `relative_color_0`、中央列にある色を `relative_color_1`、左列にある色を `relative_color_2` とする。盤面にまだ出ていない色は、現在プレイヤーの手札スロット順で空いている相対色IDに割り当てる。これにより、赤・青・緑・黄という絶対色は学習入力から消しつつ、手札内で同じ色かどうかは保持する。
 
 空スロットはすべて0にする。
 

@@ -16,8 +16,8 @@
 上限値は `src/yellowstone/observation_normalization.py` に集約する。
 
 - 盤面アンカー: `BOARD_SIZE - 1`
-- 盤面の列ごとの色枚数: 全カード枚数
 - 盤面の3x3セルごとのカード総数: 全カード枚数
+- 手札の相対色one-hot: `1`
 - 手札枚数: `HAND_SIZE`
 - deck / negative cards: 全カード枚数
 - loss score: baselineでは `64` でclip
