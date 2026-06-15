@@ -28,6 +28,7 @@ class EvaluationSummary:
     match_count: int
     win_rates: tuple[float, ...]
     average_loss_scores: tuple[float, ...]
+    average_loss_shares: tuple[float, ...]
     average_turn_count: float
     total_elapsed_seconds: float
     average_elapsed_seconds: float
@@ -90,6 +91,7 @@ def summarize_results(
             match_count=0,
             win_rates=tuple(0.0 for _ in range(player_count)),
             average_loss_scores=tuple(0.0 for _ in range(player_count)),
+            average_loss_shares=tuple(0.0 for _ in range(player_count)),
             average_turn_count=0.0,
             total_elapsed_seconds=0.0,
             average_elapsed_seconds=0.0,
@@ -104,11 +106,17 @@ def summarize_results(
         sum(result.loss_scores[player_index] for result in results) / match_count
         for player_index in range(player_count)
     )
+    average_loss_shares = tuple(
+        sum(_loss_share(result.loss_scores, player_index) for result in results)
+        / match_count
+        for player_index in range(player_count)
+    )
     total_elapsed_seconds = sum(result.elapsed_seconds for result in results)
     return EvaluationSummary(
         match_count=match_count,
         win_rates=win_rates,
         average_loss_scores=average_loss_scores,
+        average_loss_shares=average_loss_shares,
         average_turn_count=sum(result.turn_count for result in results) / match_count,
         total_elapsed_seconds=total_elapsed_seconds,
         average_elapsed_seconds=total_elapsed_seconds / match_count,
@@ -127,6 +135,13 @@ def make_random_policies(
 ) -> tuple[RandomBot, ...]:
     """Create seeded random policies for all players."""
     return tuple(RandomBot(Random(seed + index)) for index in range(player_count))
+
+
+def _loss_share(loss_scores: tuple[int, ...], player_index: int) -> float:
+    total_loss = sum(loss_scores)
+    if total_loss == 0:
+        return 0.0
+    return loss_scores[player_index] / total_loss
 
 
 def _result_from_state(

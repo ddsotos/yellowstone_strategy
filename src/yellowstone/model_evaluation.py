@@ -150,6 +150,7 @@ def write_model_evaluation_result(
                     "scenario",
                     "match_count",
                     "win_rates",
+                    "average_loss_shares",
                     "average_loss_scores",
                     "average_turn_count",
                     "total_elapsed_seconds",
@@ -191,7 +192,7 @@ def _format_summary(name: str, summary: EvaluationSummary) -> str:
     return (
         f"{name}: matches={summary.match_count} "
         f"win_rates={summary.win_rates} "
-        f"avg_loss={summary.average_loss_scores} "
+        f"loss_share={summary.average_loss_shares} "
         f"avg_turns={summary.average_turn_count:.2f}"
     )
 

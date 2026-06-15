@@ -1,3 +1,5 @@
+import pytest
+
 from yellowstone.evaluation import (
     evaluate_policies,
     make_heuristic_policies,
@@ -28,6 +30,8 @@ def test_evaluate_policies_aggregates_multiple_seeds() -> None:
     assert summary.match_count == 2
     assert len(summary.win_rates) == 4
     assert len(summary.average_loss_scores) == 4
+    assert len(summary.average_loss_shares) == 4
+    assert sum(summary.average_loss_shares) == pytest.approx(1.0)
     assert summary.average_turn_count > 0
     assert summary.total_elapsed_seconds >= summary.average_elapsed_seconds
 
@@ -47,4 +51,5 @@ def test_summarize_results_handles_empty_results() -> None:
     assert summary.match_count == 0
     assert summary.win_rates == (0.0, 0.0, 0.0, 0.0)
     assert summary.average_loss_scores == (0.0, 0.0, 0.0, 0.0)
+    assert summary.average_loss_shares == (0.0, 0.0, 0.0, 0.0)
     assert summary.average_turn_count == 0.0
