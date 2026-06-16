@@ -43,6 +43,8 @@ class TrainingConfig:
     resume_from: Path | None = None
     report_path: Path | None = DEFAULT_TRAINING_REPORT_PATH
     learning_rate: float = 0.0003
+    gamma: float = 0.99
+    n_steps: int = 2048
     verbose: int = 1
 
 
@@ -112,6 +114,8 @@ def _make_or_load_model(config: TrainingConfig, env: YellowstoneTurnGymEnv) -> A
         env,
         seed=config.seed,
         learning_rate=config.learning_rate,
+        gamma=config.gamma,
+        n_steps=config.n_steps,
         tensorboard_log=str(config.log_dir),
         verbose=config.verbose,
     )
@@ -178,6 +182,8 @@ def _parse_args() -> TrainingConfig:
     parser.add_argument("--resume-from", type=Path, default=None)
     parser.add_argument("--report-path", type=Path, default=DEFAULT_TRAINING_REPORT_PATH)
     parser.add_argument("--learning-rate", type=float, default=0.0003)
+    parser.add_argument("--gamma", type=float, default=0.99)
+    parser.add_argument("--n-steps", type=int, default=2048)
     parser.add_argument("--verbose", type=int, default=1)
     args = parser.parse_args()
     return TrainingConfig(
@@ -192,6 +198,8 @@ def _parse_args() -> TrainingConfig:
         resume_from=args.resume_from,
         report_path=args.report_path,
         learning_rate=args.learning_rate,
+        gamma=args.gamma,
+        n_steps=args.n_steps,
         verbose=args.verbose,
     )
 

@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from yellowstone.env import EnvReset, EnvStep, YellowstoneEnv
 from yellowstone.game import apply_known_legal_action
 from yellowstone.observation import state_to_observation
-from yellowstone.rewards import reward_for_transition
+from yellowstone.rewards import reward_for_transition, turn_action_reward
 from yellowstone.turn_action_space import (
     legal_turn_action_mask,
     resolve_turn_action,
@@ -44,17 +44,25 @@ class YellowstoneTurnEnv(YellowstoneEnv):
             self.state = apply_known_legal_action(self.state, action, rng=self.rng)
             if self.state.phase == Phase.GAME_OVER:
                 break
+        after_learner_turn = self.state
         if self.state.phase != Phase.GAME_OVER:
             self.state = self._advance_npcs(self.state)
 
         done = self.state.phase == Phase.GAME_OVER or self.stopped_reason is not None
+        reward = reward_for_transition(
+            before,
+            self.state,
+            player_index=self.learning_player_index,
+        )
+        reward += turn_action_reward(
+            before,
+            after_learner_turn,
+            action_index=action_index,
+            player_index=self.learning_player_index,
+        )
         return EnvStep(
             observation=state_to_observation(self.state),
-            reward=reward_for_transition(
-                before,
-                self.state,
-                player_index=self.learning_player_index,
-            ),
+            reward=reward,
             done=done,
             legal_action_mask=legal_turn_action_mask(self.state),
             info=self._info(),

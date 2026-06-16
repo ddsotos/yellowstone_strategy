@@ -17,12 +17,16 @@ def test_training_config_exposes_minimal_run_controls() -> None:
         seed=7,
         output_path=Path("models/test_model"),
         eval_freq=50,
+        gamma=0.995,
+        n_steps=1024,
     )
 
     assert config.total_timesteps == 123
     assert config.seed == 7
     assert config.output_path == Path("models/test_model")
     assert config.eval_freq == 50
+    assert config.gamma == 0.995
+    assert config.n_steps == 1024
 
 
 def test_training_config_exposes_checkpoint_and_resume_controls() -> None:

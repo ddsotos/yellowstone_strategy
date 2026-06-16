@@ -279,3 +279,11 @@ turn-level mask 生成を、36通りすべての `resolve_turn_action` 実行か
 
 ### Codex回答
 turn-level学習では行動選択時点が現在プレイヤーのプレイフェーズ開始時に揃うため、`current_player`、`phase`、`cards_played_this_turn`、`player_count` を観測から削除した。4人学習前提としてプレイヤー概要を4人分にし、各プレイヤーの `active` を削除して `hand_count`, `negative_card_count`, `loss_score` の3値にした。山札枚数は `0`, `1..6`, `7..18`, `19+` の4段階へ丸め、観測長は `61` になった。
+### ユーザー入力
+10時間かけて、確認が必要になった作業は中断しつつ、強化学習の改善を試してほしいと依頼した。
+### Codex回答
+状態評価 reward を軽量化し、`YELLOWSTONE_STATE_VALUE_REWARD_WEIGHT` で調整可能にした。さらに `gamma` / `n_steps` を学習CLIで指定できるようにし、方策診断コマンド `yellowstone.policy_diagnostics` を追加した。480kモデルから状態評価 reward で継続し、p0 loss share は 0.446 付近から 0.363、さらに2枚ターンボーナスを加えた継続で最良 0.331 付近まで改善した。ただし heuristic 同士の p0 loss share 0.241 付近にはまだ届かず、2枚選択率も learned 5%前後に対して heuristic は47%前後で、主な残課題は2枚プレイ判断の学習不足と判断した。
+### ユーザー入力
+失点なし2枚出し reward は、2枚出し後に引ける枚数に比例させ、その報酬を5倍にできるか質問した。
+### Codex回答
+`YELLOWSTONE_NO_DAMAGE_TWO_CARD_TURN_REWARD_WEIGHT` を「最大ボーナス」として扱い、失点なし2枚ターンでは `最大ボーナス * 引ける枚数 / 6` を加える形に変更した。5倍設定は最大ボーナス `3.0` とし、手札6枚では `+1.0`、手札2枚では `+3.0` になる。強めの設定だが、失点なし2枚出し限定の実験スイッチとして試す価値があると判断した。

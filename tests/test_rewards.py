@@ -1,5 +1,13 @@
-from yellowstone.rewards import reward_for_transition
-from yellowstone.types import GameState, Phase, PlayerState
+import pytest
+
+from yellowstone.rewards import (
+    no_damage_two_card_turn_max_reward,
+    reward_for_transition,
+    state_value,
+    state_value_reward_weight,
+    turn_action_reward,
+)
+from yellowstone.types import Card, Color, GameState, Phase, PlayerState, Position
 
 
 def test_reward_for_transition_rewards_loss_score_decrease() -> None:
@@ -49,3 +57,99 @@ def test_reward_for_transition_adds_terminal_reward() -> None:
 
     assert reward_for_transition(before, win_after, player_index=0) == 1.0
     assert reward_for_transition(before, lose_after, player_index=0) == -1.0
+
+
+def test_state_value_counts_no_damage_turn_options() -> None:
+    # 失点なしで置けるカードと2枚ペアがある状態を高く評価する。
+    red_one = Card(Color.RED, 0)
+    red_two = Card(Color.RED, 1)
+    state = GameState(
+        players=(
+            PlayerState(hand=(red_one, red_two)),
+            PlayerState(),
+            PlayerState(),
+            PlayerState(),
+        ),
+        board={Position(3, 0): (red_one,)},
+    )
+
+    assert state_value(state, player_index=0) == 2.4
+
+
+def test_reward_for_transition_penalizes_reduced_state_value() -> None:
+    # 即時失点がなくても次に失点なしで動ける余地が減ると小さな負報酬になる。
+    red_one = Card(Color.RED, 0)
+    red_two = Card(Color.RED, 1)
+    before = GameState(
+        players=(
+            PlayerState(hand=(red_one, red_two)),
+            PlayerState(),
+            PlayerState(),
+            PlayerState(),
+        ),
+        board={Position(3, 0): (red_one,)},
+    )
+    after = GameState(
+        players=(
+            PlayerState(hand=(red_one,)),
+            PlayerState(),
+            PlayerState(),
+            PlayerState(),
+        ),
+        board={Position(3, 0): (red_one,)},
+    )
+
+    assert reward_for_transition(before, after, player_index=0) == pytest.approx(-0.07)
+
+
+def test_state_value_reward_weight_can_be_configured(monkeypatch) -> None:
+    # 状態評価rewardの重みを実験ごとに切り替えられる。
+    monkeypatch.setenv("YELLOWSTONE_STATE_VALUE_REWARD_WEIGHT", "0.2")
+
+    assert state_value_reward_weight() == 0.2
+
+
+def test_no_damage_two_card_turn_reward_is_configurable(monkeypatch) -> None:
+    # 失点なし2枚ターンの最大追加rewardを実験ごとに切り替えられる。
+    monkeypatch.setenv("YELLOWSTONE_NO_DAMAGE_TWO_CARD_TURN_REWARD_WEIGHT", "0.5")
+
+    assert no_damage_two_card_turn_max_reward() == 0.5
+
+
+def test_turn_action_reward_scales_by_draw_count(monkeypatch) -> None:
+    # 失点なし2枚ターンの追加rewardが、補充で引ける枚数に比例する。
+    monkeypatch.setenv("YELLOWSTONE_NO_DAMAGE_TWO_CARD_TURN_REWARD_WEIGHT", "3.0")
+    cards = tuple(Card(Color.RED, index) for index in range(6))
+    before = GameState(
+        players=(
+            PlayerState(hand=cards),
+            PlayerState(),
+            PlayerState(),
+            PlayerState(),
+        )
+    )
+    after = GameState(
+        players=(PlayerState(), PlayerState(), PlayerState(), PlayerState())
+    )
+
+    assert turn_action_reward(before, after, action_index=6, player_index=0) == 1.0
+    assert turn_action_reward(before, after, action_index=0, player_index=0) == 0.0
+
+
+def test_turn_action_reward_is_larger_with_low_hand_count(monkeypatch) -> None:
+    # 手札が少ないほど2枚出し後に多く補充できるため、追加rewardが大きくなる。
+    monkeypatch.setenv("YELLOWSTONE_NO_DAMAGE_TWO_CARD_TURN_REWARD_WEIGHT", "3.0")
+    cards = (Card(Color.RED, 0), Card(Color.RED, 1))
+    before = GameState(
+        players=(
+            PlayerState(hand=cards),
+            PlayerState(),
+            PlayerState(),
+            PlayerState(),
+        )
+    )
+    after = GameState(
+        players=(PlayerState(), PlayerState(), PlayerState(), PlayerState())
+    )
+
+    assert turn_action_reward(before, after, action_index=6, player_index=0) == 3.0
