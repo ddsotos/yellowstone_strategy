@@ -1,6 +1,7 @@
 import pytest
 
 from yellowstone.rewards import (
+    learned_state_value_reward,
     learned_state_value_model_path,
     learned_state_value_residual_by_hand_count,
     learned_state_value_reward_weight,
@@ -154,15 +155,72 @@ def test_reward_for_transition_adds_learned_loss_share_improvement(
     monkeypatch.setenv("YELLOWSTONE_LEARNED_STATE_VALUE_MODEL_PATH", "model.pt")
     monkeypatch.setenv("YELLOWSTONE_LEARNED_STATE_VALUE_REWARD_WEIGHT", "2.0")
 
-    def fake_loss_share(state, *, player_index, model_path, residual_by_hand_count):
+    def fake_loss_share(
+        state,
+        *,
+        player_index,
+        model_path,
+        residual_by_hand_count,
+        allow_player_perspective=False,
+    ):
         assert player_index == 0
         assert model_path == "model.pt"
         assert not residual_by_hand_count
+        assert not allow_player_perspective
         return 0.30 if state is before else 0.20
 
     monkeypatch.setattr("yellowstone.rewards.learned_state_loss_share", fake_loss_share)
 
     assert reward_for_transition(before, after, player_index=0) == pytest.approx(0.2)
+
+
+def test_learned_state_value_reward_can_use_post_refill_state(
+    monkeypatch,
+) -> None:
+    # turn-level学習ではNPC手番後ではなく、補充後のP0視点状態で学習済み状態価値を評価する。
+    before = GameState(
+        players=(
+            PlayerState(hand=(Card(Color.RED, 0), Card(Color.RED, 1))),
+            PlayerState(),
+            PlayerState(),
+            PlayerState(),
+        )
+    )
+    after_refill = GameState(
+        players=(
+            PlayerState(hand=tuple(Card(Color.RED, index) for index in range(6))),
+            PlayerState(),
+            PlayerState(),
+            PlayerState(),
+        ),
+        current_player_index=1,
+    )
+    monkeypatch.setenv("YELLOWSTONE_LEARNED_STATE_VALUE_MODEL_PATH", "model.pt")
+    monkeypatch.setenv("YELLOWSTONE_LEARNED_STATE_VALUE_REWARD_WEIGHT", "2.0")
+
+    def fake_loss_share(
+        state,
+        *,
+        player_index,
+        model_path,
+        residual_by_hand_count,
+        allow_player_perspective=False,
+    ):
+        assert player_index == 0
+        assert model_path == "model.pt"
+        if state is after_refill:
+            assert allow_player_perspective
+            return 0.15
+        return 0.25
+
+    monkeypatch.setattr("yellowstone.rewards.learned_state_loss_share", fake_loss_share)
+
+    assert learned_state_value_reward(
+        before,
+        after_refill,
+        player_index=0,
+        allow_after_player_perspective=True,
+    ) == pytest.approx(0.2)
 
 
 def test_turn_action_reward_scales_by_draw_count(monkeypatch) -> None:

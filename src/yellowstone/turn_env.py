@@ -7,7 +7,11 @@ from dataclasses import dataclass
 from yellowstone.env import EnvReset, EnvStep, YellowstoneEnv
 from yellowstone.game import apply_known_legal_action
 from yellowstone.observation import state_to_observation
-from yellowstone.rewards import reward_for_transition, turn_action_reward
+from yellowstone.rewards import (
+    learned_state_value_reward,
+    reward_for_transition,
+    turn_action_reward,
+)
 from yellowstone.turn_action_space import (
     legal_turn_action_mask,
     resolve_turn_action,
@@ -53,6 +57,13 @@ class YellowstoneTurnEnv(YellowstoneEnv):
             before,
             self.state,
             player_index=self.learning_player_index,
+            include_learned_state_value=False,
+        )
+        reward += learned_state_value_reward(
+            before,
+            after_learner_turn,
+            player_index=self.learning_player_index,
+            allow_after_player_perspective=True,
         )
         reward += turn_action_reward(
             before,

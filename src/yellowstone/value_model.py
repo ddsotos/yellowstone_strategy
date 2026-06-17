@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from functools import cache
+from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
@@ -18,15 +19,18 @@ def learned_state_loss_share(
     player_index: int,
     model_path: str,
     residual_by_hand_count: bool = False,
+    allow_player_perspective: bool = False,
 ) -> float:
     """Predict final loss share for a learner turn-start state."""
-    if (
-        state.phase != Phase.PLAY
-        or state.current_player_index != player_index
-        or state.cards_played_this_turn != 0
-    ):
+    if state.phase != Phase.PLAY or state.cards_played_this_turn != 0:
         return 0.0
-    observation = normalize_observation(state_to_observation(state))
+    if state.current_player_index == player_index:
+        evaluated_state = state
+    elif allow_player_perspective:
+        evaluated_state = replace(state, current_player_index=player_index)
+    else:
+        return 0.0
+    observation = normalize_observation(state_to_observation(evaluated_state))
     predictor = _load_predictor(str(Path(model_path)))
     prediction, hand_count_baselines = predictor(observation)
     if not residual_by_hand_count:

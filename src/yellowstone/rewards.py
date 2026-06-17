@@ -26,6 +26,7 @@ def reward_for_transition(
     after: GameState,
     *,
     player_index: int,
+    include_learned_state_value: bool = True,
 ) -> float:
     """Return the baseline reward for one environment transition."""
     before_player = before.players[player_index]
@@ -39,20 +40,12 @@ def reward_for_transition(
         state_value(after, player_index=player_index)
         - state_value(before, player_index=player_index)
     )
-    reward += learned_state_value_reward_weight() * (
-        learned_state_loss_share(
+    if include_learned_state_value:
+        reward += learned_state_value_reward(
             before,
-            player_index=player_index,
-            model_path=model_path,
-            residual_by_hand_count=learned_state_value_residual_by_hand_count(),
-        )
-        - learned_state_loss_share(
             after,
             player_index=player_index,
-            model_path=model_path,
-            residual_by_hand_count=learned_state_value_residual_by_hand_count(),
         )
-    ) if (model_path := learned_state_value_model_path()) else 0.0
     if after.phase == Phase.GAME_OVER:
         reward += WIN_REWARD if player_index in after.winners else LOSS_REWARD
     return float(reward)
@@ -74,6 +67,35 @@ def turn_action_reward(
     draw_count = HAND_SIZE - max(0, before_hand_count - 2)
     draw_count = max(0, min(HAND_SIZE, draw_count))
     return two_card_turn_max_reward() * draw_count / HAND_SIZE
+
+
+def learned_state_value_reward(
+    before: GameState,
+    after: GameState,
+    *,
+    player_index: int,
+    allow_after_player_perspective: bool = False,
+) -> float:
+    """Return reward from learned expected loss share improvement."""
+    model_path = learned_state_value_model_path()
+    if model_path is None:
+        return 0.0
+    residual = learned_state_value_residual_by_hand_count()
+    return learned_state_value_reward_weight() * (
+        learned_state_loss_share(
+            before,
+            player_index=player_index,
+            model_path=model_path,
+            residual_by_hand_count=residual,
+        )
+        - learned_state_loss_share(
+            after,
+            player_index=player_index,
+            model_path=model_path,
+            residual_by_hand_count=residual,
+            allow_player_perspective=allow_after_player_perspective,
+        )
+    )
 
 
 def state_value(state: GameState, *, player_index: int) -> float:
