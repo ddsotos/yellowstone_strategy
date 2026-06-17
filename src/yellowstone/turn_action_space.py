@@ -63,6 +63,24 @@ def turn_action_to_index(action: TurnAction) -> int:
 
 def resolve_turn_action(state: GameState, index: int) -> tuple[Action, ...]:
     """Resolve a turn-level action into concrete heuristic low-level actions."""
+    resolved = list(resolve_turn_action_before_refill(state, index))
+    current_state = state
+    for action in resolved:
+        current_state = apply_known_legal_action(current_state, action)
+
+    if current_state.phase == Phase.REFILL:
+        refill_action = HeuristicBot().choose_action(current_state)
+        if refill_action is None:
+            raise ValueError("no refill action is available")
+        resolved.append(refill_action)
+    return tuple(resolved)
+
+
+def resolve_turn_action_before_refill(
+    state: GameState,
+    index: int,
+) -> tuple[Action, ...]:
+    """Resolve a turn-level action, stopping before refill randomness."""
     action = turn_action_from_index(index)
     if state.phase != Phase.PLAY:
         raise ValueError("turn action can only start in play phase")
@@ -86,11 +104,6 @@ def resolve_turn_action(state: GameState, index: int) -> tuple[Action, ...]:
         resolved.append(end_turn)
         current_state = apply_known_legal_action(current_state, end_turn)
 
-    if current_state.phase == Phase.REFILL:
-        refill_action = HeuristicBot().choose_action(current_state)
-        if refill_action is None:
-            raise ValueError("no refill action is available")
-        resolved.append(refill_action)
     return tuple(resolved)
 
 

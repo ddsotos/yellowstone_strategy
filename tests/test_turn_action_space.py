@@ -7,6 +7,7 @@ from yellowstone.turn_action_space import (
     legal_turn_action_indices,
     legal_turn_action_mask,
     resolve_turn_action,
+    resolve_turn_action_before_refill,
     turn_action_from_index,
     turn_action_space_metadata,
     turn_action_to_index,
@@ -65,6 +66,19 @@ def test_resolve_two_card_turn_uses_two_selected_original_slots() -> None:
     assert actions[1].hand_index == 0
     assert actions[1] in legal_actions(state_after_first)
     assert any(isinstance(action, RefillAction) for action in actions)
+
+
+def test_resolve_turn_action_before_refill_stops_at_refill() -> None:
+    # 2枚出しのturn-level行動は、補充乱数の手前で止められる。
+    state = create_initial_state(4, seed=1)
+
+    actions = resolve_turn_action_before_refill(
+        state,
+        turn_action_to_index(TurnAction((0, 1))),
+    )
+
+    assert len(actions) == 2
+    assert all(isinstance(action, PlaceCardAction) for action in actions)
 
 
 def test_legal_turn_action_mask_uses_available_hand_slots() -> None:
