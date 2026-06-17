@@ -6,7 +6,12 @@ from dataclasses import dataclass, field
 from random import Random
 from typing import Protocol
 
-from yellowstone.game import frame_positions, legal_actions, occupied_count_in_frame
+from yellowstone.game import (
+    apply_known_legal_action,
+    frame_positions,
+    legal_actions,
+    occupied_count_in_frame,
+)
 from yellowstone.types import (
     Action,
     Board,
@@ -49,6 +54,50 @@ class RandomBot:
         if not actions:
             return None
         return self.rng.choice(actions)
+
+
+@dataclass(slots=True)
+class ExploratoryHeuristicBot:
+    """Heuristic policy that sometimes stops after one card for value data."""
+
+    rng: Random = field(default_factory=Random)
+    one_card_probabilities: dict[int, float] = field(
+        default_factory=lambda: {
+            6: 0.35,
+            5: 0.25,
+            4: 0.15,
+        }
+    )
+    _forced_one_card_players: set[int] = field(default_factory=set, init=False)
+
+    def choose_action(self, state: GameState) -> Action | None:
+        """Choose heuristic actions while broadening turn-start hand counts."""
+        if state.phase != Phase.PLAY:
+            return choose_heuristic_action(state)
+
+        player_index = state.current_player_index
+        if state.cards_played_this_turn == 1:
+            if player_index in self._forced_one_card_players:
+                self._forced_one_card_players.remove(player_index)
+                end_turn = _first_action(legal_actions(state), EndTurnAction)
+                if end_turn is not None:
+                    return end_turn
+            return choose_heuristic_action(state)
+
+        if state.cards_played_this_turn != 0:
+            return choose_heuristic_action(state)
+
+        player = state.players[player_index]
+        probability = self.one_card_probabilities.get(len(player.hand), 0.0)
+        if probability <= 0.0 or self.rng.random() >= probability:
+            return choose_heuristic_action(state)
+
+        first_action = _choose_no_damage_two_card_first_action(state)
+        if first_action is None:
+            return choose_heuristic_action(state)
+
+        self._forced_one_card_players.add(player_index)
+        return first_action
 
 
 @dataclass(frozen=True, slots=True)
@@ -145,6 +194,31 @@ def _choose_no_damage_first_action(
     if not first_candidates:
         return None
     return min(first_candidates, key=lambda candidate: candidate.sort_key).action
+
+
+def _choose_no_damage_two_card_first_action(state: GameState) -> PlaceCardAction | None:
+    actions = legal_actions(state)
+    first_actions = _place_actions(actions)
+    first_candidates = _no_damage_candidates(
+        state,
+        first_actions,
+        _player_negative_count(state),
+    )
+    ordered_first_actions = tuple(
+        candidate.action
+        for candidate in sorted(first_candidates, key=lambda c: c.sort_key)
+    )
+    for first_action in ordered_first_actions:
+        after_first = apply_known_legal_action(state, first_action)
+        second_actions = _place_actions(legal_actions(after_first))
+        second_candidates = _no_damage_candidates(
+            after_first,
+            second_actions,
+            _player_negative_count(after_first),
+        )
+        if second_candidates:
+            return first_action
+    return None
 
 
 def _no_damage_candidates(

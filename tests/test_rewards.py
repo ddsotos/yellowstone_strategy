@@ -1,11 +1,14 @@
 import pytest
 
 from yellowstone.rewards import (
-    no_damage_two_card_turn_max_reward,
+    learned_state_value_model_path,
+    learned_state_value_residual_by_hand_count,
+    learned_state_value_reward_weight,
     reward_for_transition,
     state_value,
     state_value_reward_weight,
     turn_action_reward,
+    two_card_turn_max_reward,
 )
 from yellowstone.types import Card, Color, GameState, Phase, PlayerState, Position
 
@@ -109,16 +112,62 @@ def test_state_value_reward_weight_can_be_configured(monkeypatch) -> None:
     assert state_value_reward_weight() == 0.2
 
 
-def test_no_damage_two_card_turn_reward_is_configurable(monkeypatch) -> None:
-    # 失点なし2枚ターンの最大追加rewardを実験ごとに切り替えられる。
-    monkeypatch.setenv("YELLOWSTONE_NO_DAMAGE_TWO_CARD_TURN_REWARD_WEIGHT", "0.5")
+def test_two_card_turn_reward_is_configurable(monkeypatch) -> None:
+    # 2枚ターンの最大追加rewardを実験ごとに切り替えられる。
+    monkeypatch.setenv("YELLOWSTONE_TWO_CARD_TURN_REWARD_WEIGHT", "0.5")
 
-    assert no_damage_two_card_turn_max_reward() == 0.5
+    assert two_card_turn_max_reward() == 0.5
+
+
+def test_learned_state_value_reward_is_configurable(monkeypatch) -> None:
+    # 学習済み状態価値rewardのモデルパスと重みを環境変数で切り替えられる。
+    monkeypatch.setenv("YELLOWSTONE_LEARNED_STATE_VALUE_MODEL_PATH", "model.pt")
+    monkeypatch.setenv("YELLOWSTONE_LEARNED_STATE_VALUE_REWARD_WEIGHT", "0.7")
+    monkeypatch.setenv("YELLOWSTONE_LEARNED_STATE_VALUE_RESIDUAL_BY_HAND", "1")
+
+    assert learned_state_value_model_path() == "model.pt"
+    assert learned_state_value_reward_weight() == 0.7
+    assert learned_state_value_residual_by_hand_count()
+
+
+def test_reward_for_transition_adds_learned_loss_share_improvement(
+    monkeypatch,
+) -> None:
+    # 予測失点割合が下がる状態遷移は、学習済み状態価値rewardで正に評価される。
+    before = GameState(
+        players=(
+            PlayerState(hand=(Card(Color.RED, 0),)),
+            PlayerState(),
+            PlayerState(),
+            PlayerState(),
+        )
+    )
+    after = GameState(
+        players=(
+            PlayerState(hand=(Card(Color.RED, 1),)),
+            PlayerState(),
+            PlayerState(),
+            PlayerState(),
+        )
+    )
+    monkeypatch.setenv("YELLOWSTONE_STATE_VALUE_REWARD_WEIGHT", "0.0")
+    monkeypatch.setenv("YELLOWSTONE_LEARNED_STATE_VALUE_MODEL_PATH", "model.pt")
+    monkeypatch.setenv("YELLOWSTONE_LEARNED_STATE_VALUE_REWARD_WEIGHT", "2.0")
+
+    def fake_loss_share(state, *, player_index, model_path, residual_by_hand_count):
+        assert player_index == 0
+        assert model_path == "model.pt"
+        assert not residual_by_hand_count
+        return 0.30 if state is before else 0.20
+
+    monkeypatch.setattr("yellowstone.rewards.learned_state_loss_share", fake_loss_share)
+
+    assert reward_for_transition(before, after, player_index=0) == pytest.approx(0.2)
 
 
 def test_turn_action_reward_scales_by_draw_count(monkeypatch) -> None:
-    # 失点なし2枚ターンの追加rewardが、補充で引ける枚数に比例する。
-    monkeypatch.setenv("YELLOWSTONE_NO_DAMAGE_TWO_CARD_TURN_REWARD_WEIGHT", "3.0")
+    # 2枚ターンの追加rewardが、補充で引ける枚数に比例する。
+    monkeypatch.setenv("YELLOWSTONE_TWO_CARD_TURN_REWARD_WEIGHT", "1.8")
     cards = tuple(Card(Color.RED, index) for index in range(6))
     before = GameState(
         players=(
@@ -132,13 +181,13 @@ def test_turn_action_reward_scales_by_draw_count(monkeypatch) -> None:
         players=(PlayerState(), PlayerState(), PlayerState(), PlayerState())
     )
 
-    assert turn_action_reward(before, after, action_index=6, player_index=0) == 1.0
+    assert turn_action_reward(before, after, action_index=6, player_index=0) == 0.6
     assert turn_action_reward(before, after, action_index=0, player_index=0) == 0.0
 
 
 def test_turn_action_reward_is_larger_with_low_hand_count(monkeypatch) -> None:
     # 手札が少ないほど2枚出し後に多く補充できるため、追加rewardが大きくなる。
-    monkeypatch.setenv("YELLOWSTONE_NO_DAMAGE_TWO_CARD_TURN_REWARD_WEIGHT", "3.0")
+    monkeypatch.setenv("YELLOWSTONE_TWO_CARD_TURN_REWARD_WEIGHT", "1.8")
     cards = (Card(Color.RED, 0), Card(Color.RED, 1))
     before = GameState(
         players=(
@@ -152,4 +201,28 @@ def test_turn_action_reward_is_larger_with_low_hand_count(monkeypatch) -> None:
         players=(PlayerState(), PlayerState(), PlayerState(), PlayerState())
     )
 
-    assert turn_action_reward(before, after, action_index=6, player_index=0) == 3.0
+    assert turn_action_reward(before, after, action_index=6, player_index=0) == 1.8
+
+
+def test_turn_action_reward_allows_negative_card_increase(monkeypatch) -> None:
+    # マイナスカードが増える2枚出しでも、補充価値の追加rewardは付く。
+    monkeypatch.setenv("YELLOWSTONE_TWO_CARD_TURN_REWARD_WEIGHT", "1.8")
+    cards = tuple(Card(Color.RED, index) for index in range(6))
+    before = GameState(
+        players=(
+            PlayerState(hand=cards, negative_cards=()),
+            PlayerState(),
+            PlayerState(),
+            PlayerState(),
+        )
+    )
+    after = GameState(
+        players=(
+            PlayerState(negative_cards=(Card(Color.BLUE, 0),)),
+            PlayerState(),
+            PlayerState(),
+            PlayerState(),
+        )
+    )
+
+    assert turn_action_reward(before, after, action_index=6, player_index=0) == 0.6
