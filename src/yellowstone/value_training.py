@@ -21,8 +21,11 @@ class StateValueTrainingResult:
     validation_count: int
     train_loss: float
     validation_loss: float
+    weighted_train_loss: float
+    weighted_validation_loss: float
     validation_loss_by_hand_count: tuple[float | None, ...]
     validation_count_by_hand_count: tuple[int, ...]
+    balance_by_hand_count: bool
     output_path: str
 
 
@@ -48,6 +51,7 @@ def train_state_value_model(
     learning_rate: float = 1e-3,
     validation_ratio: float = 0.2,
     seed: int = 1,
+    balance_by_hand_count: bool = False,
 ) -> StateValueTrainingResult:
     """Train a compact MLP that predicts final loss share from observations."""
     torch = _import_torch()
@@ -80,9 +84,20 @@ def train_state_value_model(
 
     train_x = features[:train_count]
     train_y = targets[:train_count]
+    train_hand_counts = hand_counts[:train_count]
     validation_x = features[train_count:]
     validation_y = targets[train_count:]
     validation_hand_counts = hand_counts[train_count:]
+    train_weights = _sample_weights_by_hand_count(
+        torch,
+        train_hand_counts,
+        enabled=balance_by_hand_count,
+    )
+    validation_weights = _sample_weights_by_hand_count(
+        torch,
+        validation_hand_counts,
+        enabled=balance_by_hand_count,
+    )
 
     model = make_state_value_model(torch)
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
@@ -92,16 +107,39 @@ def train_state_value_model(
         for start in range(0, train_count, batch_size):
             batch_x = train_x[start : start + batch_size]
             batch_y = train_y[start : start + batch_size]
+            batch_weights = train_weights[start : start + batch_size]
             optimizer.zero_grad()
-            loss = loss_fn(model(batch_x), batch_y)
+            loss = _weighted_mse_loss(
+                torch,
+                model(batch_x),
+                batch_y,
+                batch_weights,
+            )
             loss.backward()
             optimizer.step()
 
     with torch.no_grad():
-        train_loss = float(loss_fn(model(train_x), train_y).item())
+        train_predictions = model(train_x)
+        train_loss = float(loss_fn(train_predictions, train_y).item())
+        weighted_train_loss = float(
+            _weighted_mse_loss(
+                torch,
+                train_predictions,
+                train_y,
+                train_weights,
+            ).item()
+        )
         validation_predictions = model(validation_x)
         validation_loss = float(
             loss_fn(validation_predictions, validation_y).item()
+        )
+        weighted_validation_loss = float(
+            _weighted_mse_loss(
+                torch,
+                validation_predictions,
+                validation_y,
+                validation_weights,
+            ).item()
         )
         validation_loss_by_hand_count, validation_count_by_hand_count = (
             _validation_metrics_by_hand_count(
@@ -120,6 +158,7 @@ def train_state_value_model(
             "observation_size": OBSERVATION_SIZE,
             "target": "final_loss_share",
             "hand_count_target_means": _hand_count_target_means(samples),
+            "balance_by_hand_count": balance_by_hand_count,
         },
         output,
     )
@@ -130,8 +169,11 @@ def train_state_value_model(
         validation_count=validation_count,
         train_loss=train_loss,
         validation_loss=validation_loss,
+        weighted_train_loss=weighted_train_loss,
+        weighted_validation_loss=weighted_validation_loss,
         validation_loss_by_hand_count=validation_loss_by_hand_count,
         validation_count_by_hand_count=validation_count_by_hand_count,
+        balance_by_hand_count=balance_by_hand_count,
         output_path=str(output),
     )
     if report_path is not None:
@@ -154,8 +196,11 @@ def state_value_training_result_to_dict(
         "validation_count": result.validation_count,
         "train_loss": result.train_loss,
         "validation_loss": result.validation_loss,
+        "weighted_train_loss": result.weighted_train_loss,
+        "weighted_validation_loss": result.weighted_validation_loss,
         "validation_loss_by_hand_count": list(result.validation_loss_by_hand_count),
         "validation_count_by_hand_count": list(result.validation_count_by_hand_count),
+        "balance_by_hand_count": result.balance_by_hand_count,
         "output_path": result.output_path,
     }
 
@@ -195,6 +240,32 @@ def _validation_metrics_by_hand_count(
     return tuple(losses), tuple(counts)
 
 
+def _sample_weights_by_hand_count(
+    torch: Any,
+    hand_counts: Any,
+    *,
+    enabled: bool,
+) -> Any:
+    if not enabled:
+        return torch.ones_like(hand_counts, dtype=torch.float32)
+    counts = torch.bincount(hand_counts, minlength=7).to(torch.float32)
+    present = counts > 0
+    weights_by_hand = torch.zeros_like(counts)
+    weights_by_hand[present] = 1.0 / counts[present]
+    weights = weights_by_hand[hand_counts]
+    return weights * (len(weights) / weights.sum())
+
+
+def _weighted_mse_loss(
+    torch: Any,
+    predictions: Any,
+    targets: Any,
+    weights: Any,
+) -> Any:
+    squared_errors = torch.square(predictions - targets).flatten()
+    return (squared_errors * weights).sum() / weights.sum()
+
+
 class _StateValueModel:
     def __new__(cls, torch: Any) -> Any:
         return make_state_value_model(torch)
@@ -222,6 +293,7 @@ def main() -> None:
     parser.add_argument("--learning-rate", type=float, default=1e-3)
     parser.add_argument("--validation-ratio", type=float, default=0.2)
     parser.add_argument("--seed", type=int, default=1)
+    parser.add_argument("--balance-by-hand-count", action="store_true")
     args = parser.parse_args()
 
     result = train_state_value_model(
@@ -233,6 +305,7 @@ def main() -> None:
         learning_rate=args.learning_rate,
         validation_ratio=args.validation_ratio,
         seed=args.seed,
+        balance_by_hand_count=args.balance_by_hand_count,
     )
     print(json.dumps(state_value_training_result_to_dict(result), indent=2))
 

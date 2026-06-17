@@ -84,6 +84,22 @@ def test_collect_counterfactual_state_value_samples_after_refill() -> None:
     assert all(0.0 <= sample.target_loss_share <= 1.0 for sample in samples)
 
 
+def test_collect_counterfactual_state_value_samples_accepts_exploration_rates() -> None:
+    # 低手札状態を増やすため、探索用の1枚止め確率を外から指定できる。
+    samples = collect_counterfactual_state_value_samples(
+        source_games=1,
+        source_state_limit=2,
+        actions_per_state=2,
+        source_seed_start=1,
+        exploratory_sources=True,
+        exploratory_one_card_probabilities={6: 1.0, 5: 1.0, 4: 1.0},
+        target_state="after-refill",
+    )
+
+    assert samples
+    assert all(sample.player_index == 0 for sample in samples)
+
+
 def test_state_value_samples_round_trip_jsonl(tmp_path) -> None:
     # 状態価値サンプルをJSONLへ保存し、同じ内容として読み戻せることを確認する。
     sample = StateValueSample(
@@ -139,6 +155,35 @@ def test_train_state_value_model_saves_model(tmp_path) -> None:
     assert model_path.exists()
     assert result.sample_count == 3
     assert result.validation_count == 1
+    assert not result.balance_by_hand_count
     assert len(result.validation_loss_by_hand_count) == 7
     assert len(result.validation_count_by_hand_count) == 7
     assert sum(result.validation_count_by_hand_count) == result.validation_count
+
+
+def test_train_state_value_model_can_balance_by_hand_count(tmp_path) -> None:
+    # 手札枚数ごとの偏りを抑える重み付きlossでvalue modelを学習できる。
+    pytest.importorskip("torch")
+    samples = (
+        StateValueSample(tuple(0.0 for _ in range(OBSERVATION_SIZE)), 0.2, 0, 6, 1, 0),
+        StateValueSample(tuple(0.1 for _ in range(OBSERVATION_SIZE)), 0.2, 0, 6, 1, 1),
+        StateValueSample(tuple(0.2 for _ in range(OBSERVATION_SIZE)), 0.2, 0, 6, 1, 2),
+        StateValueSample(tuple(1.0 for _ in range(OBSERVATION_SIZE)), 0.4, 1, 4, 1, 3),
+    )
+    dataset_path = tmp_path / "value-samples.jsonl"
+    model_path = tmp_path / "value-model.pt"
+
+    write_state_value_samples(samples, dataset_path)
+    result = train_state_value_model(
+        dataset_path=dataset_path,
+        output_path=model_path,
+        epochs=1,
+        batch_size=2,
+        seed=1,
+        balance_by_hand_count=True,
+    )
+
+    assert model_path.exists()
+    assert result.balance_by_hand_count
+    assert result.weighted_train_loss >= 0.0
+    assert result.weighted_validation_loss >= 0.0

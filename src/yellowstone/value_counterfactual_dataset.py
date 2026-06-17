@@ -35,6 +35,7 @@ def collect_counterfactual_state_value_samples(
     source_state_limit: int = 1000,
     actions_per_state: int = 4,
     exploratory_sources: bool = False,
+    exploratory_one_card_probabilities: dict[int, float] | None = None,
     learning_player_index: int = 0,
     player_count: int = 4,
     max_actions: int = 10_000,
@@ -47,6 +48,7 @@ def collect_counterfactual_state_value_samples(
         source_seed_start=source_seed_start,
         source_state_limit=source_state_limit,
         exploratory_sources=exploratory_sources,
+        exploratory_one_card_probabilities=exploratory_one_card_probabilities,
         learning_player_index=learning_player_index,
         player_count=player_count,
         max_actions=max_actions,
@@ -132,6 +134,7 @@ def _collect_source_states(
     source_seed_start: int,
     source_state_limit: int,
     exploratory_sources: bool,
+    exploratory_one_card_probabilities: dict[int, float] | None,
     learning_player_index: int,
     player_count: int,
     max_actions: int,
@@ -147,6 +150,7 @@ def _collect_source_states(
             player_count=player_count,
             exploratory=exploratory_sources,
             seed=seed,
+            one_card_probabilities=exploratory_one_card_probabilities,
         )
         action_count = 0
         while state.phase != Phase.GAME_OVER and action_count < max_actions:
@@ -168,10 +172,22 @@ def _make_policies(
     player_count: int,
     exploratory: bool,
     seed: int,
+    one_card_probabilities: dict[int, float] | None,
 ) -> tuple[BotPolicy, ...]:
     if exploratory:
         return tuple(
-            ExploratoryHeuristicBot(rng=Random(seed + index))
+            ExploratoryHeuristicBot(
+                rng=Random(seed + index),
+                one_card_probabilities=(
+                    dict(one_card_probabilities)
+                    if one_card_probabilities is not None
+                    else {
+                        6: 0.35,
+                        5: 0.25,
+                        4: 0.15,
+                    }
+                ),
+            )
             for index in range(player_count)
         )
     return tuple(HeuristicBot() for _ in range(player_count))
@@ -279,6 +295,24 @@ def _as_learner_perspective(
     return replace(state, current_player_index=learning_player_index)
 
 
+def _parse_one_card_probabilities(
+    values: tuple[str, ...],
+) -> dict[int, float] | None:
+    if not values:
+        return None
+    probabilities: dict[int, float] = {}
+    for value in values:
+        hand_count_text, probability_text = value.split("=", maxsplit=1)
+        hand_count = int(hand_count_text)
+        probability = float(probability_text)
+        if not 0 <= hand_count <= 6:
+            raise ValueError(f"hand count must be 0..6: {hand_count}")
+        if not 0.0 <= probability <= 1.0:
+            raise ValueError(f"probability must be 0..1: {probability}")
+        probabilities[hand_count] = probability
+    return probabilities
+
+
 def _loss_share(state: GameState, *, player_index: int) -> float:
     total_loss = sum(player.loss_score for player in state.players)
     if total_loss == 0:
@@ -295,6 +329,11 @@ def main() -> None:
     parser.add_argument("--actions-per-state", type=int, default=4)
     parser.add_argument("--exploratory-sources", action="store_true")
     parser.add_argument(
+        "--one-card-probability",
+        action="append",
+        metavar="HAND=PROBABILITY",
+    )
+    parser.add_argument(
         "--target-state",
         choices=("next-learner-turn", "after-refill"),
         default="next-learner-turn",
@@ -309,6 +348,9 @@ def main() -> None:
         source_state_limit=args.source_state_limit,
         actions_per_state=args.actions_per_state,
         exploratory_sources=args.exploratory_sources,
+        exploratory_one_card_probabilities=_parse_one_card_probabilities(
+            tuple(args.one_card_probability or ())
+        ),
         target_state=args.target_state,
     )
     write_state_value_samples(samples, args.output)
