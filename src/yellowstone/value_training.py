@@ -21,6 +21,8 @@ class StateValueTrainingResult:
     validation_count: int
     train_loss: float
     validation_loss: float
+    validation_loss_by_hand_count: tuple[float | None, ...]
+    validation_count_by_hand_count: tuple[int, ...]
     output_path: str
 
 
@@ -62,9 +64,14 @@ def train_state_value_model(
         [[sample.target_loss_share] for sample in samples],
         dtype=torch.float32,
     )
+    hand_counts = torch.tensor(
+        [sample.hand_count for sample in samples],
+        dtype=torch.int64,
+    )
     permutation = torch.randperm(len(samples))
     features = features[permutation]
     targets = targets[permutation]
+    hand_counts = hand_counts[permutation]
 
     validation_count = max(1, int(len(samples) * validation_ratio))
     train_count = len(samples) - validation_count
@@ -75,6 +82,7 @@ def train_state_value_model(
     train_y = targets[:train_count]
     validation_x = features[train_count:]
     validation_y = targets[train_count:]
+    validation_hand_counts = hand_counts[train_count:]
 
     model = make_state_value_model(torch)
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
@@ -91,7 +99,18 @@ def train_state_value_model(
 
     with torch.no_grad():
         train_loss = float(loss_fn(model(train_x), train_y).item())
-        validation_loss = float(loss_fn(model(validation_x), validation_y).item())
+        validation_predictions = model(validation_x)
+        validation_loss = float(
+            loss_fn(validation_predictions, validation_y).item()
+        )
+        validation_loss_by_hand_count, validation_count_by_hand_count = (
+            _validation_metrics_by_hand_count(
+                torch,
+                validation_predictions,
+                validation_y,
+                validation_hand_counts,
+            )
+        )
 
     output = Path(output_path)
     output.parent.mkdir(parents=True, exist_ok=True)
@@ -111,6 +130,8 @@ def train_state_value_model(
         validation_count=validation_count,
         train_loss=train_loss,
         validation_loss=validation_loss,
+        validation_loss_by_hand_count=validation_loss_by_hand_count,
+        validation_count_by_hand_count=validation_count_by_hand_count,
         output_path=str(output),
     )
     if report_path is not None:
@@ -125,7 +146,7 @@ def train_state_value_model(
 
 def state_value_training_result_to_dict(
     result: StateValueTrainingResult,
-) -> dict[str, int | float | str]:
+) -> dict[str, int | float | str | list[float | None] | list[int]]:
     """Convert training result to JSON-friendly data."""
     return {
         "sample_count": result.sample_count,
@@ -133,6 +154,8 @@ def state_value_training_result_to_dict(
         "validation_count": result.validation_count,
         "train_loss": result.train_loss,
         "validation_loss": result.validation_loss,
+        "validation_loss_by_hand_count": list(result.validation_loss_by_hand_count),
+        "validation_count_by_hand_count": list(result.validation_count_by_hand_count),
         "output_path": result.output_path,
     }
 
@@ -150,6 +173,26 @@ def _hand_count_target_means(samples: tuple[Any, ...]) -> list[float]:
         (sum(targets) / len(targets)) if targets else fallback
         for targets in grouped
     ]
+
+
+def _validation_metrics_by_hand_count(
+    torch: Any,
+    predictions: Any,
+    targets: Any,
+    hand_counts: Any,
+) -> tuple[tuple[float | None, ...], tuple[int, ...]]:
+    losses: list[float | None] = []
+    counts: list[int] = []
+    squared_errors = torch.square(predictions - targets).flatten()
+    for hand_count in range(7):
+        mask = hand_counts == hand_count
+        count = int(mask.sum().item())
+        counts.append(count)
+        if count == 0:
+            losses.append(None)
+            continue
+        losses.append(float(squared_errors[mask].mean().item()))
+    return tuple(losses), tuple(counts)
 
 
 class _StateValueModel:

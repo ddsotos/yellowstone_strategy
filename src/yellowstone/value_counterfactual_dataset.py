@@ -4,8 +4,10 @@ from __future__ import annotations
 
 import argparse
 import json
+from dataclasses import replace
 from pathlib import Path
 from random import Random
+from typing import Literal
 
 from yellowstone.bots import BotPolicy, ExploratoryHeuristicBot, HeuristicBot
 from yellowstone.game import apply_known_legal_action, create_initial_state
@@ -19,9 +21,11 @@ from yellowstone.types import GameState, Phase
 from yellowstone.value_dataset import (
     StateValueSample,
     summarize_state_value_samples,
-    write_state_value_samples,
     state_value_dataset_summary_to_dict,
+    write_state_value_samples,
 )
+
+CounterfactualTargetState = Literal["next-learner-turn", "after-refill"]
 
 
 def collect_counterfactual_state_value_samples(
@@ -34,8 +38,9 @@ def collect_counterfactual_state_value_samples(
     learning_player_index: int = 0,
     player_count: int = 4,
     max_actions: int = 10_000,
+    target_state: CounterfactualTargetState = "next-learner-turn",
 ) -> tuple[StateValueSample, ...]:
-    """Collect next-learner-turn samples from sampled learner turn actions."""
+    """Collect value samples from sampled learner turn actions."""
     rng = Random(source_seed_start)
     source_states = _collect_source_states(
         source_games=source_games,
@@ -58,25 +63,36 @@ def collect_counterfactual_state_value_samples(
                 action_index=action_index,
                 rng=rng,
             )
-            after_state = _advance_to_learner_turn(
+            sample_state = _counterfactual_sample_state(
                 after_state,
+                target_state=target_state,
                 learning_player_index=learning_player_index,
                 rng=rng,
                 max_actions=max_actions,
             )
             final_state = _rollout_to_game_over(
-                after_state,
+                sample_state,
                 rng=rng,
                 max_actions=max_actions,
             )
             if final_state.phase != Phase.GAME_OVER:
                 continue
-            if not _is_learner_turn_start(after_state, learning_player_index):
+            if not _can_evaluate_as_learner(
+                sample_state,
+                target_state=target_state,
+                learning_player_index=learning_player_index,
+            ):
                 continue
-            player = after_state.players[learning_player_index]
+            evaluated_state = _as_learner_perspective(
+                sample_state,
+                learning_player_index=learning_player_index,
+            )
+            player = evaluated_state.players[learning_player_index]
             samples.append(
                 StateValueSample(
-                    observation=normalize_observation(state_to_observation(after_state)),
+                    observation=normalize_observation(
+                        state_to_observation(evaluated_state)
+                    ),
                     target_loss_share=_loss_share(
                         final_state,
                         player_index=learning_player_index,
@@ -88,6 +104,26 @@ def collect_counterfactual_state_value_samples(
                 )
             )
     return tuple(samples)
+
+
+def _counterfactual_sample_state(
+    state: GameState,
+    *,
+    target_state: CounterfactualTargetState,
+    learning_player_index: int,
+    rng: Random,
+    max_actions: int,
+) -> GameState:
+    if target_state == "after-refill":
+        return state
+    if target_state == "next-learner-turn":
+        return _advance_to_learner_turn(
+            state,
+            learning_player_index=learning_player_index,
+            rng=rng,
+            max_actions=max_actions,
+        )
+    raise ValueError(f"unsupported counterfactual target state: {target_state}")
 
 
 def _collect_source_states(
@@ -217,6 +253,32 @@ def _is_learner_turn_start(state: GameState, learning_player_index: int) -> bool
     )
 
 
+def _can_evaluate_as_learner(
+    state: GameState,
+    *,
+    target_state: CounterfactualTargetState,
+    learning_player_index: int,
+) -> bool:
+    if state.phase != Phase.PLAY or state.cards_played_this_turn != 0:
+        return False
+    if target_state == "next-learner-turn":
+        return state.current_player_index == learning_player_index
+    return (
+        state.current_player_index == learning_player_index
+        or 0 <= learning_player_index < len(state.players)
+    )
+
+
+def _as_learner_perspective(
+    state: GameState,
+    *,
+    learning_player_index: int,
+) -> GameState:
+    if state.current_player_index == learning_player_index:
+        return state
+    return replace(state, current_player_index=learning_player_index)
+
+
 def _loss_share(state: GameState, *, player_index: int) -> float:
     total_loss = sum(player.loss_score for player in state.players)
     if total_loss == 0:
@@ -232,6 +294,11 @@ def main() -> None:
     parser.add_argument("--source-state-limit", type=int, default=1000)
     parser.add_argument("--actions-per-state", type=int, default=4)
     parser.add_argument("--exploratory-sources", action="store_true")
+    parser.add_argument(
+        "--target-state",
+        choices=("next-learner-turn", "after-refill"),
+        default="next-learner-turn",
+    )
     parser.add_argument("--output", required=True)
     parser.add_argument("--summary-output")
     args = parser.parse_args()
@@ -242,6 +309,7 @@ def main() -> None:
         source_state_limit=args.source_state_limit,
         actions_per_state=args.actions_per_state,
         exploratory_sources=args.exploratory_sources,
+        target_state=args.target_state,
     )
     write_state_value_samples(samples, args.output)
     summary = summarize_state_value_samples(

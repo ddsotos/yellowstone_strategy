@@ -68,6 +68,22 @@ def test_collect_counterfactual_state_value_samples_from_turn_actions() -> None:
     assert all(0.0 <= sample.target_loss_share <= 1.0 for sample in samples)
 
 
+def test_collect_counterfactual_state_value_samples_after_refill() -> None:
+    # 反事実データを手番終了・補充直後の学習者視点状態として収集できる。
+    samples = collect_counterfactual_state_value_samples(
+        source_games=1,
+        source_state_limit=2,
+        actions_per_state=2,
+        source_seed_start=1,
+        target_state="after-refill",
+    )
+
+    assert samples
+    assert all(sample.player_index == 0 for sample in samples)
+    assert all(len(sample.observation) == OBSERVATION_SIZE for sample in samples)
+    assert all(0.0 <= sample.target_loss_share <= 1.0 for sample in samples)
+
+
 def test_state_value_samples_round_trip_jsonl(tmp_path) -> None:
     # 状態価値サンプルをJSONLへ保存し、同じ内容として読み戻せることを確認する。
     sample = StateValueSample(
@@ -123,3 +139,6 @@ def test_train_state_value_model_saves_model(tmp_path) -> None:
     assert model_path.exists()
     assert result.sample_count == 3
     assert result.validation_count == 1
+    assert len(result.validation_loss_by_hand_count) == 7
+    assert len(result.validation_count_by_hand_count) == 7
+    assert sum(result.validation_count_by_hand_count) == result.validation_count
