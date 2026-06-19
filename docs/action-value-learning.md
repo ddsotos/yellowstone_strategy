@@ -147,3 +147,38 @@ work on action-value data quality and continuing-game targets.
 
 Validation loss is not perfectly aligned with greedy policy quality. Keep
 evaluating checkpoints directly instead of selecting only by validation loss.
+
+## Continuing Horizon-20 Smoke
+
+Run `action-value-run-010-h20-continuing-s300` used:
+
+```text
+source_state_limit = 300
+actions_per_state = 0
+horizon_learner_turns = 20
+continuing_game = true
+samples = 8018
+```
+
+The continuing collector fixed the sample sparsity problem, but the first
+models were worse than the horizon-8 baseline:
+
+```text
+self_loss e30, immediate-loss-penalty 1.0:
+  p0 loss share ~= 0.430 / 100 games
+self_loss e10, immediate-loss-penalty 1.0:
+  p0 loss share ~= 0.505 / 100 games
+relative_loss e30, immediate-loss-penalty 1.0:
+  p0 loss share ~= 0.429 / 100 games
+self_loss e30, immediate-loss-penalty 3.0:
+  p0 loss share ~= 0.414 / 100 games
+self_loss e30, immediate-loss-penalty 5.0:
+  p0 loss share ~= 0.417 / 100 games
+```
+
+The e30 diagnostics with immediate-loss-penalty `1.0` showed a model two-card
+rate of about `0.682`, compared with heuristic's `0.571`. The immediate-loss
+penalty helped only slightly. This suggests the current horizon-20 continuing
+labels are still encouraging too many costly two-card turns, or that the model
+needs a better target scale / policy extraction method before longer horizons
+become useful.
