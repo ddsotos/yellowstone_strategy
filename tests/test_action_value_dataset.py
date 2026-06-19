@@ -30,6 +30,7 @@ def test_action_value_samples_round_trip_jsonl(tmp_path) -> None:
     # action-valueサンプルをJSONLへ保存し、同じ内容として読み戻せる。
     sample = ActionValueSample(
         observation=tuple(0.0 for _ in range(OBSERVATION_SIZE)),
+        after_observation=tuple(0.1 for _ in range(OBSERVATION_SIZE)),
         action_index=6,
         target_self_loss=2.0,
         target_relative_loss=0.5,
@@ -46,11 +47,28 @@ def test_action_value_samples_round_trip_jsonl(tmp_path) -> None:
     assert loaded == (sample,)
 
 
+def test_collect_action_value_samples_can_continue_past_game_end() -> None:
+    # 継続ゲーム扱いなら、35点終了に遮られず長めhorizonの教師データを作れる。
+    samples = collect_action_value_samples(
+        source_games=1,
+        source_state_limit=1,
+        actions_per_state=1,
+        horizon_learner_turns=20,
+        source_seed_start=1,
+        continuing_game=True,
+        max_actions=20_000,
+    )
+
+    assert samples
+    assert all(sample.target_self_loss >= 0 for sample in samples)
+
+
 def test_summarize_action_value_samples_counts_coverage() -> None:
     # action-valueサンプルの手札枚数と行動indexの分布を集計できる。
     samples = (
         ActionValueSample(
             tuple(0.0 for _ in range(OBSERVATION_SIZE)),
+            tuple(0.1 for _ in range(OBSERVATION_SIZE)),
             6,
             2.0,
             0.5,
@@ -61,6 +79,7 @@ def test_summarize_action_value_samples_counts_coverage() -> None:
         ),
         ActionValueSample(
             tuple(0.0 for _ in range(OBSERVATION_SIZE)),
+            tuple(0.2 for _ in range(OBSERVATION_SIZE)),
             7,
             1.0,
             -0.25,
@@ -76,9 +95,11 @@ def test_summarize_action_value_samples_counts_coverage() -> None:
         source_games=1,
         source_states=1,
         horizon_learner_turns=2,
+        continuing_game=True,
     )
 
     assert summary.samples == 2
+    assert summary.continuing_game is True
     assert summary.hand_count_histogram[6] == 1
     assert summary.action_count_histogram[6] == 1
 
@@ -89,6 +110,7 @@ def test_train_action_value_model_saves_model(tmp_path) -> None:
     samples = (
         ActionValueSample(
             tuple(0.0 for _ in range(OBSERVATION_SIZE)),
+            tuple(0.1 for _ in range(OBSERVATION_SIZE)),
             0,
             2.0,
             0.5,
@@ -99,6 +121,7 @@ def test_train_action_value_model_saves_model(tmp_path) -> None:
         ),
         ActionValueSample(
             tuple(1.0 for _ in range(OBSERVATION_SIZE)),
+            tuple(0.9 for _ in range(OBSERVATION_SIZE)),
             6,
             1.0,
             -0.25,
@@ -109,6 +132,7 @@ def test_train_action_value_model_saves_model(tmp_path) -> None:
         ),
         ActionValueSample(
             tuple(0.5 for _ in range(OBSERVATION_SIZE)),
+            tuple(0.6 for _ in range(OBSERVATION_SIZE)),
             7,
             3.0,
             1.0,

@@ -14,7 +14,7 @@ from yellowstone.turn_action_space import TURN_ACTION_SPACE_SIZE
 
 
 ActionValueTarget = Literal["relative_loss", "self_loss"]
-ACTION_VALUE_FEATURE_SIZE = OBSERVATION_SIZE + TURN_ACTION_SPACE_SIZE
+ACTION_VALUE_FEATURE_SIZE = OBSERVATION_SIZE * 2 + TURN_ACTION_SPACE_SIZE
 
 
 @dataclass(frozen=True, slots=True)
@@ -61,7 +61,14 @@ def train_action_value_model(
 
     torch.manual_seed(seed)
     features = torch.tensor(
-        [_feature_vector(sample.observation, sample.action_index) for sample in samples],
+        [
+            _feature_vector(
+                sample.observation,
+                sample.after_observation,
+                sample.action_index,
+            )
+            for sample in samples
+        ],
         dtype=torch.float32,
     )
     targets = torch.tensor(
@@ -148,11 +155,12 @@ def action_value_training_result_to_dict(
 
 def _feature_vector(
     observation: tuple[float, ...],
+    after_observation: tuple[float, ...],
     action_index: int,
 ) -> tuple[float, ...]:
     action_features = [0.0] * TURN_ACTION_SPACE_SIZE
     action_features[action_index] = 1.0
-    return observation + tuple(action_features)
+    return observation + after_observation + tuple(action_features)
 
 
 def _target_value(sample: Any, target: ActionValueTarget) -> float:
