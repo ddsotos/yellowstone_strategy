@@ -182,3 +182,59 @@ penalty helped only slightly. This suggests the current horizon-20 continuing
 labels are still encouraging too many costly two-card turns, or that the model
 needs a better target scale / policy extraction method before longer horizons
 become useful.
+
+## Advantage Gated Policy
+
+For using a learned model as a heuristic improvement layer, the dataset now
+stores heuristic-relative labels:
+
+```text
+target_self_advantage = heuristic_target_self_loss - action_target_self_loss
+target_relative_advantage = heuristic_target_relative_loss - action_target_relative_loss
+```
+
+Positive advantage means the candidate action was better than the heuristic
+action in the same source state and rollout setting. The evaluator supports:
+
+```bash
+python -m yellowstone.action_value_evaluation \
+  models/yellowstone_advantage_h8_continuing_self_run001_e30.pt \
+  --policy advantage_gated \
+  --advantage-margin 6.0 \
+  --loss-guard 2 \
+  --continuing-learner-turns 200 \
+  --games 50
+```
+
+Initial run `advantage-run-001-h8-continuing-s500` used:
+
+```text
+source_state_limit = 500
+actions_per_state = 0
+horizon_learner_turns = 8
+continuing_game = true
+samples = 13196
+target = self_advantage
+```
+
+Continuing-game 200 learner-turn evaluation:
+
+```text
+margin 0.5, loss_guard 2:
+  p0 loss share ~= 0.352 / 50 games
+margin 1.0, loss_guard 2:
+  p0 loss share ~= 0.359 / 50 games
+margin 2.0, loss_guard 2:
+  p0 loss share ~= 0.341 / 50 games
+margin 4.0, loss_guard 2:
+  p0 loss share ~= 0.334 / 50 games
+margin 6.0, loss_guard 2:
+  p0 loss share ~= 0.304 / 50 games
+```
+
+The higher margin result is close to the previous h8 greedy model's continuing
+loss share around `0.300`, but it still does not beat heuristic-only around
+`0.243`. This suggests the first advantage model is not yet accurate enough to
+identify beneficial deviations. The next useful data pass should oversample
+states where heuristic chooses one card but legal two-card actions exist,
+especially low-hand states and no-damage/tolerable-damage two-card choices.

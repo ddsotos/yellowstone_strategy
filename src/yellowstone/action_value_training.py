@@ -13,7 +13,12 @@ from yellowstone.observation import OBSERVATION_SIZE
 from yellowstone.turn_action_space import TURN_ACTION_SPACE_SIZE
 
 
-ActionValueTarget = Literal["relative_loss", "self_loss"]
+ActionValueTarget = Literal[
+    "relative_loss",
+    "self_loss",
+    "relative_advantage",
+    "self_advantage",
+]
 ACTION_VALUE_FEATURE_SIZE = OBSERVATION_SIZE * 2 + TURN_ACTION_SPACE_SIZE
 
 
@@ -168,6 +173,10 @@ def _target_value(sample: Any, target: ActionValueTarget) -> float:
         return float(sample.target_relative_loss)
     if target == "self_loss":
         return float(sample.target_self_loss)
+    if target == "relative_advantage":
+        return float(sample.target_relative_advantage)
+    if target == "self_advantage":
+        return float(sample.target_self_advantage)
     raise ValueError(f"unsupported target: {target}")
 
 
@@ -190,7 +199,12 @@ def main() -> None:
     parser.add_argument("--report-path")
     parser.add_argument(
         "--target",
-        choices=("relative_loss", "self_loss"),
+        choices=(
+            "relative_loss",
+            "self_loss",
+            "relative_advantage",
+            "self_advantage",
+        ),
         default="relative_loss",
     )
     parser.add_argument("--epochs", type=int, default=20)

@@ -14,6 +14,7 @@ from yellowstone.bots import BotPolicy, ExploratoryHeuristicBot, HeuristicBot
 from yellowstone.game import apply_known_legal_action, create_initial_state
 from yellowstone.observation import OBSERVATION_SIZE, state_to_observation
 from yellowstone.observation_normalization import normalize_observation
+from yellowstone.policy_diagnostics import _heuristic_turn_action_index
 from yellowstone.turn_action_space import (
     TURN_ACTION_SPACE_SIZE,
     legal_turn_action_indices,
@@ -36,6 +37,9 @@ class ActionValueSample:
     hand_count: int
     seed: int
     turn_index: int
+    heuristic_action_index: int = -1
+    target_self_advantage: float = 0.0
+    target_relative_advantage: float = 0.0
 
 
 @dataclass(frozen=True, slots=True)
@@ -83,10 +87,13 @@ def collect_action_value_samples(
         player = state.players[learning_player_index]
         observation = normalize_observation(state_to_observation(state))
         baseline_losses = tuple(player.loss_score for player in state.players)
+        heuristic_action_index = _heuristic_turn_action_index(state)
+        action_results: list[tuple[int, GameState, tuple[float, float]]] = []
         for action_index in _sample_action_indices(
             state,
             actions_per_state=actions_per_state,
             rng=rng,
+            required_action_index=heuristic_action_index,
         ):
             after_decision = _apply_turn_action_before_refill(
                 state,
@@ -104,6 +111,19 @@ def collect_action_value_samples(
             )
             if result is None:
                 continue
+            action_results.append((action_index, after_decision, result))
+        heuristic_result = next(
+            (
+                result
+                for action_index, _, result in action_results
+                if action_index == heuristic_action_index
+            ),
+            None,
+        )
+        if heuristic_result is None:
+            continue
+        heuristic_self_loss, heuristic_relative_loss = heuristic_result
+        for action_index, after_decision, result in action_results:
             target_self_loss, target_relative_loss = result
             samples.append(
                 ActionValueSample(
@@ -119,6 +139,11 @@ def collect_action_value_samples(
                     hand_count=len(player.hand),
                     seed=source_seed_start + source_index,
                     turn_index=source_index,
+                    heuristic_action_index=heuristic_action_index,
+                    target_self_advantage=heuristic_self_loss - target_self_loss,
+                    target_relative_advantage=(
+                        heuristic_relative_loss - target_relative_loss
+                    ),
                 )
             )
     return tuple(samples)
@@ -264,12 +289,16 @@ def _sample_action_indices(
     *,
     actions_per_state: int,
     rng: Random,
+    required_action_index: int | None = None,
 ) -> tuple[int, ...]:
     legal_indices = list(legal_turn_action_indices(state))
     if actions_per_state <= 0 or actions_per_state >= len(legal_indices):
         return tuple(legal_indices)
     rng.shuffle(legal_indices)
-    return tuple(sorted(legal_indices[:actions_per_state]))
+    selected = set(legal_indices[:actions_per_state])
+    if required_action_index is not None and required_action_index in legal_indices:
+        selected.add(required_action_index)
+    return tuple(sorted(selected))
 
 
 def _apply_turn_action_before_refill(
@@ -446,6 +475,9 @@ def _sample_to_dict(sample: ActionValueSample) -> dict[str, object]:
         "hand_count": sample.hand_count,
         "seed": sample.seed,
         "turn_index": sample.turn_index,
+        "heuristic_action_index": sample.heuristic_action_index,
+        "target_self_advantage": sample.target_self_advantage,
+        "target_relative_advantage": sample.target_relative_advantage,
     }
 
 
@@ -470,6 +502,11 @@ def _sample_from_dict(data: dict[str, object]) -> ActionValueSample:
         hand_count=int(data["hand_count"]),
         seed=int(data["seed"]),
         turn_index=int(data["turn_index"]),
+        heuristic_action_index=int(data.get("heuristic_action_index", -1)),
+        target_self_advantage=float(data.get("target_self_advantage", 0.0)),
+        target_relative_advantage=float(
+            data.get("target_relative_advantage", 0.0)
+        ),
     )
 
 

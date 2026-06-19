@@ -38,6 +38,9 @@ def test_action_value_samples_round_trip_jsonl(tmp_path) -> None:
         hand_count=6,
         seed=1,
         turn_index=0,
+        heuristic_action_index=6,
+        target_self_advantage=1.0,
+        target_relative_advantage=0.5,
     )
     path = tmp_path / "action-value-samples.jsonl"
 
@@ -76,6 +79,9 @@ def test_summarize_action_value_samples_counts_coverage() -> None:
             6,
             1,
             0,
+            6,
+            0.0,
+            0.0,
         ),
         ActionValueSample(
             tuple(0.0 for _ in range(OBSERVATION_SIZE)),
@@ -87,6 +93,9 @@ def test_summarize_action_value_samples_counts_coverage() -> None:
             5,
             1,
             1,
+            6,
+            1.0,
+            0.75,
         ),
     )
 
@@ -118,6 +127,9 @@ def test_train_action_value_model_saves_model(tmp_path) -> None:
             6,
             1,
             0,
+            0,
+            0.0,
+            0.0,
         ),
         ActionValueSample(
             tuple(1.0 for _ in range(OBSERVATION_SIZE)),
@@ -129,6 +141,9 @@ def test_train_action_value_model_saves_model(tmp_path) -> None:
             6,
             1,
             1,
+            0,
+            1.0,
+            0.75,
         ),
         ActionValueSample(
             tuple(0.5 for _ in range(OBSERVATION_SIZE)),
@@ -140,6 +155,9 @@ def test_train_action_value_model_saves_model(tmp_path) -> None:
             5,
             1,
             2,
+            0,
+            -1.0,
+            -0.5,
         ),
     )
     dataset_path = tmp_path / "action-value-samples.jsonl"
