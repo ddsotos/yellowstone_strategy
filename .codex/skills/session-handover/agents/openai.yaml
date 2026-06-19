@@ -1,0 +1,4 @@
+interface:
+  display_name: "Session Handover"
+  short_description: "Generate concise project handover notes"
+  default_prompt: "Generate a handover note for the current session."
