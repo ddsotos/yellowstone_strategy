@@ -117,6 +117,31 @@ def heuristic_turn_features(state: GameState) -> tuple[int, int, int, int]:
     )
 
 
+def heuristic_played_rank_features(state: GameState) -> tuple[int, int, int]:
+    """Return one-card rank and sorted two-card ranks for heuristic plans."""
+    one_card_plan = choose_heuristic_one_card_plan(state)
+    two_card_plan = choose_heuristic_two_card_plan(state)
+    return heuristic_played_rank_features_from_plans(
+        state,
+        one_card_plan=one_card_plan,
+        two_card_plan=two_card_plan,
+    )
+
+
+def heuristic_played_rank_features_from_plans(
+    state: GameState,
+    *,
+    one_card_plan: HeuristicTurnPlan | None,
+    two_card_plan: HeuristicTurnPlan | None,
+) -> tuple[int, int, int]:
+    """Return rank-index features without recomputing prebuilt plans."""
+    one_card_rank = _first_place_rank(state, one_card_plan)
+    two_card_ranks = sorted(_place_ranks(state, two_card_plan))
+    if len(two_card_ranks) != 2:
+        two_card_ranks = [0, 0]
+    return one_card_rank, two_card_ranks[0], two_card_ranks[1]
+
+
 def negative_card_delta_after_actions(
     state: GameState,
     actions: tuple[Action, ...],
@@ -138,6 +163,27 @@ def _place_actions(state: GameState) -> tuple[PlaceCardAction, ...]:
     return tuple(
         action for action in legal_actions(state) if isinstance(action, PlaceCardAction)
     )
+
+
+def _first_place_rank(state: GameState, plan: HeuristicTurnPlan | None) -> int:
+    ranks = _place_ranks(state, plan)
+    return 0 if not ranks else ranks[0]
+
+
+def _place_ranks(state: GameState, plan: HeuristicTurnPlan | None) -> list[int]:
+    if plan is None:
+        return []
+    ranks: list[int] = []
+    current_state = state
+    for action in plan.actions:
+        if isinstance(action, PlaceCardAction):
+            ranks.append(
+                current_state.players[
+                    current_state.current_player_index
+                ].hand[action.hand_index].rank_index
+            )
+            current_state = apply_known_legal_action(current_state, action)
+    return ranks
 
 
 def _negative_card_delta_between(before: GameState, after: GameState) -> int:

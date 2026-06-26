@@ -1,7 +1,12 @@
+from yellowstone.heuristic_turn_plan import (
+    HeuristicTurnPlan,
+    heuristic_played_rank_features_from_plans,
+)
 from yellowstone.observation import (
     BOARD_OBSERVATION_SIZE,
     HEURISTIC_BONUS_OBSERVATION_SIZE,
     HEURISTIC_NEGATIVE_DELTA_OBSERVATION_SIZE,
+    HEURISTIC_PLAYED_RANK_OBSERVATION_SIZE,
     HAND_OBSERVATION_SIZE,
     OBSERVATION_SIZE,
     OPPONENT_LAST_TURN_OBSERVATION_SIZE,
@@ -12,8 +17,11 @@ from yellowstone.observation import (
 from yellowstone.types import (
     Card,
     Color,
+    EndTurnAction,
+    Frame,
     GameState,
     PlayerState,
+    PlaceCardAction,
     Position,
 )
 
@@ -158,6 +166,7 @@ def test_state_to_observation_encodes_players_and_scalars() -> None:
     scalar_start = (
         heuristic_negative_delta_start
         + HEURISTIC_NEGATIVE_DELTA_OBSERVATION_SIZE
+        + HEURISTIC_PLAYED_RANK_OBSERVATION_SIZE
     )
 
     assert observation[player_start : player_start + 12] == (
@@ -288,3 +297,78 @@ def test_state_to_observation_accepts_precomputed_negative_deltas() -> None:
         observation[start : start + HEURISTIC_NEGATIVE_DELTA_OBSERVATION_SIZE]
         == (2, 5)
     )
+
+
+def test_state_to_observation_accepts_precomputed_played_ranks() -> None:
+    # 事前計算した1枚案・2枚案の数字を観測へそのまま利用できる。
+    state = GameState(
+        players=(
+            PlayerState(
+                hand=(
+                    Card(Color.BLUE, 4),
+                    Card(Color.GREEN, 1),
+                    Card(Color.RED, 6),
+                )
+            ),
+            PlayerState(),
+            PlayerState(),
+            PlayerState(),
+        ),
+    )
+
+    observation = state_to_observation(
+        state,
+        heuristic_bonuses=(0, 0),
+        heuristic_negative_deltas=(0, 0),
+        heuristic_played_ranks=(4, 1, 6),
+    )
+    start = (
+        BOARD_OBSERVATION_SIZE
+        + HAND_OBSERVATION_SIZE
+        + PLAYERS_OBSERVATION_SIZE
+        + OPPONENT_LAST_TURN_OBSERVATION_SIZE
+        + HEURISTIC_BONUS_OBSERVATION_SIZE
+        + HEURISTIC_NEGATIVE_DELTA_OBSERVATION_SIZE
+    )
+
+    assert observation[start : start + HEURISTIC_PLAYED_RANK_OBSERVATION_SIZE] == (
+        4,
+        1,
+        6,
+    )
+
+
+def test_heuristic_played_rank_features_sorts_two_card_ranks() -> None:
+    # 2枚案の数字特徴は実際のプレイ順ではなく昇順で入る。
+    state = GameState(
+        players=(
+            PlayerState(hand=(Card(Color.BLUE, 5), Card(Color.GREEN, 2))),
+            PlayerState(),
+            PlayerState(),
+            PlayerState(),
+        ),
+    )
+    one_card_plan = HeuristicTurnPlan(
+        actions=(
+            PlaceCardAction(0, Position(0, 5), Frame(0, 3)),
+            EndTurnAction(),
+        ),
+        bonus_score=0,
+        negative_card_delta=0,
+    )
+    two_card_plan = HeuristicTurnPlan(
+        actions=(
+            PlaceCardAction(0, Position(0, 5), Frame(0, 3)),
+            PlaceCardAction(0, Position(1, 2), Frame(0, 2)),
+        ),
+        bonus_score=0,
+        negative_card_delta=0,
+    )
+
+    ranks = heuristic_played_rank_features_from_plans(
+        state,
+        one_card_plan=one_card_plan,
+        two_card_plan=two_card_plan,
+    )
+
+    assert ranks == (5, 2, 5)

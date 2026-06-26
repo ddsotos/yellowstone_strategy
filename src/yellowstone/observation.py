@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
-from yellowstone.heuristic_turn_plan import heuristic_turn_features
+from yellowstone.heuristic_turn_plan import (
+    heuristic_played_rank_features,
+    heuristic_turn_features,
+)
 from yellowstone.types import (
     FRAME_SIZE,
     HAND_SIZE,
@@ -31,6 +34,7 @@ PLAYERS_OBSERVATION_SIZE = OBSERVED_PLAYER_COUNT * PLAYER_FEATURE_SIZE
 OPPONENT_LAST_TURN_OBSERVATION_SIZE = OBSERVED_PLAYER_COUNT - 1
 HEURISTIC_BONUS_OBSERVATION_SIZE = 2
 HEURISTIC_NEGATIVE_DELTA_OBSERVATION_SIZE = 2
+HEURISTIC_PLAYED_RANK_OBSERVATION_SIZE = 3
 SCALAR_OBSERVATION_SIZE = 2
 OBSERVATION_SIZE = (
     BOARD_OBSERVATION_SIZE
@@ -39,6 +43,7 @@ OBSERVATION_SIZE = (
     + OPPONENT_LAST_TURN_OBSERVATION_SIZE
     + HEURISTIC_BONUS_OBSERVATION_SIZE
     + HEURISTIC_NEGATIVE_DELTA_OBSERVATION_SIZE
+    + HEURISTIC_PLAYED_RANK_OBSERVATION_SIZE
     + SCALAR_OBSERVATION_SIZE
 )
 
@@ -48,6 +53,7 @@ def state_to_observation(
     *,
     heuristic_bonuses: tuple[int, int] | None = None,
     heuristic_negative_deltas: tuple[int, int] | None = None,
+    heuristic_played_ranks: tuple[int, int, int] | None = None,
 ) -> tuple[int, ...]:
     """Encode a state as a fixed-length integer tuple."""
     values: list[int] = []
@@ -61,8 +67,11 @@ def state_to_observation(
             heuristic_bonuses = turn_features[:2]
         if heuristic_negative_deltas is None:
             heuristic_negative_deltas = turn_features[2:]
+    if heuristic_played_ranks is None:
+        heuristic_played_ranks = heuristic_played_rank_features(state)
     values.extend(heuristic_bonuses)
     values.extend(heuristic_negative_deltas)
+    values.extend(heuristic_played_ranks)
     values.extend(
         [
             _deck_bucket(len(state.deck)),
@@ -88,6 +97,7 @@ def observation_metadata() -> dict[str, int]:
         "heuristic_negative_delta_size": (
             HEURISTIC_NEGATIVE_DELTA_OBSERVATION_SIZE
         ),
+        "heuristic_played_rank_size": HEURISTIC_PLAYED_RANK_OBSERVATION_SIZE,
         "scalar_size": SCALAR_OBSERVATION_SIZE,
     }
 

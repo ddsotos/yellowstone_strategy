@@ -54,6 +54,16 @@ def test_create_initial_state_deals_hands_and_places_initial_card() -> None:
     assert state.phase == Phase.PLAY
 
 
+def test_create_initial_state_sorts_hands_by_rank() -> None:
+    # 初期手札は観測時に並べ替えず、配札時点で数字昇順に保つ。
+    state = create_initial_state(4, seed=1)
+
+    for player in state.players:
+        assert player.hand == tuple(
+            sorted(player.hand, key=lambda card: (card.rank_index, card.color.value))
+        )
+
+
 def test_create_initial_state_rejects_unsupported_player_count() -> None:
     # 初期実装では4〜5人以外を拒否することを確認する。
     with pytest.raises(ValueError):
@@ -176,6 +186,37 @@ def test_refill_after_one_card_empty_hand_advances_after_deck_draw() -> None:
     assert next_state.cards_played_this_turn == 0
     assert next_state.phase == Phase.PLAY
     assert next_state.last_turn_play_counts == (1, 0, 0, 0)
+
+
+def test_refill_sorts_hand_after_draw() -> None:
+    # 補充で引いたカードは手札に追加した後、数字昇順に整列される。
+    state = GameState(
+        players=(
+            PlayerState(hand=(Card(Color.RED, 5), Card(Color.BLUE, 1))),
+            PlayerState(),
+            PlayerState(),
+            PlayerState(),
+        ),
+        deck=(
+            Card(Color.GREEN, 4),
+            Card(Color.YELLOW, 0),
+            Card(Color.RED, 2),
+            Card(Color.BLUE, 6),
+        ),
+        phase=Phase.REFILL,
+        cards_played_this_turn=2,
+    )
+
+    next_state = apply_action(state, RefillAction(RefillSource.DECK))
+
+    assert next_state.players[0].hand == (
+        Card(Color.YELLOW, 0),
+        Card(Color.BLUE, 1),
+        Card(Color.RED, 2),
+        Card(Color.GREEN, 4),
+        Card(Color.RED, 5),
+        Card(Color.BLUE, 6),
+    )
 
 
 def test_end_turn_with_empty_hand_can_recover_from_negative_cards() -> None:

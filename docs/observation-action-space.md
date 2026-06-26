@@ -15,7 +15,7 @@ state_to_observation(state: GameState) -> tuple[int, ...]
 observation_metadata() -> dict[str, int]
 ```
 
-観測長は `OBSERVATION_SIZE` で固定する。2026-06-21 時点では `68`。
+観測長は `OBSERVATION_SIZE` で固定する。2026-06-26 時点では `71`。
 
 内訳:
 
@@ -25,7 +25,8 @@ observation_metadata() -> dict[str, int]
 4. 相手3人の直前ターンのプレイ枚数: `3`
 5. 1枚案・2枚案の即時ボーナス点: `2`
 6. 1枚案・2枚案の即時マイナス増加量: `2`
-7. スカラー: `2`
+7. 1枚案・2枚案で出す数字: `3`
+8. スカラー: `2`
 
 ### 盤面
 
@@ -43,7 +44,8 @@ left_center_right_column_counts[3]
 
 ### 手札
 
-現在プレイヤーの手札だけを、最大6スロットで表す。
+現在プレイヤーの手札だけを、最大6スロットで表す。手札は状態更新時に
+`rank_index, color` の順で整列し、観測時には並べ替えない。
 
 各スロットは以下の6値:
 
@@ -72,7 +74,11 @@ hand_count, negative_card_count, loss_score
 - 相手の直前ターン枚数: 現在プレイヤーから順に次の3人
 - heuristic即時ボーナス: `one_card_bonus`, `two_card_bonus`
 - heuristic即時マイナス増加: `one_card_negative_delta`, `two_card_negative_delta`
+- heuristicで出す数字: `one_card_rank`, `two_card_low_rank`, `two_card_high_rank`
 - スカラー: `deck_bucket`, `settlement_count`
+
+2枚案の数字は実際のプレイ順ではなく昇順で入れる。これにより、同じ2枚を
+使う判断が順序違いの別特徴として扱われることを避ける。
 
 `deck_bucket` は山札枚数を以下の4段階に丸める。
 

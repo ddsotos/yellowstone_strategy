@@ -1,7 +1,9 @@
 import pytest
+from random import Random
 
 from yellowstone.action_value_dataset import (
     ActionValueSample,
+    _apply_rollout_action,
     collect_action_value_samples,
     read_action_value_samples,
     summarize_action_value_samples,
@@ -9,6 +11,8 @@ from yellowstone.action_value_dataset import (
 )
 from yellowstone.action_value_training import train_action_value_model
 from yellowstone.observation import OBSERVATION_SIZE
+from yellowstone.types import Card, Color, GameState, Phase, PlayerState
+from yellowstone.types import RefillAction, RefillSource
 
 
 def test_collect_action_value_samples_labels_turn_actions() -> None:
@@ -64,6 +68,37 @@ def test_collect_action_value_samples_can_continue_past_game_end() -> None:
 
     assert samples
     assert all(sample.target_self_loss >= 0 for sample in samples)
+
+
+def test_continuing_deck_refill_keeps_hand_sorted() -> None:
+    # 継続ゲームの山札切れ補充でも手札の数字昇順を保つ。
+    state = GameState(
+        players=(
+            PlayerState(
+                hand=(Card(Color.RED, 5), Card(Color.BLUE, 1)),
+                negative_cards=(Card(Color.GREEN, 0),),
+            ),
+            PlayerState(),
+            PlayerState(),
+            PlayerState(),
+        ),
+        deck=(Card(Color.YELLOW, 3),),
+        phase=Phase.REFILL,
+        cards_played_this_turn=2,
+    )
+
+    next_state = _apply_rollout_action(
+        state,
+        RefillAction(RefillSource.DECK),
+        rng=Random(1),
+        continuing_game=True,
+    )
+
+    assert next_state.players[0].hand == (
+        Card(Color.BLUE, 1),
+        Card(Color.YELLOW, 3),
+        Card(Color.RED, 5),
+    )
 
 
 def test_summarize_action_value_samples_counts_coverage() -> None:

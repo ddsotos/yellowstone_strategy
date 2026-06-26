@@ -15,6 +15,7 @@ from yellowstone.game import create_initial_state
 from yellowstone.heuristic_turn_plan import (
     choose_heuristic_one_card_plan,
     choose_heuristic_two_card_plan,
+    heuristic_played_rank_features_from_plans,
 )
 from yellowstone.observation import OBSERVATION_SIZE, state_to_observation
 from yellowstone.observation_normalization import normalize_observation
@@ -130,6 +131,13 @@ def collect_two_card_decision_samples(
                         heuristic_negative_deltas=(
                             one_card_plan.negative_card_delta,
                             two_card_plan.negative_card_delta,
+                        ),
+                        heuristic_played_ranks=(
+                            heuristic_played_rank_features_from_plans(
+                                state,
+                                one_card_plan=one_card_plan,
+                                two_card_plan=two_card_plan,
+                            )
                         ),
                     )
                 ),

@@ -45,6 +45,11 @@ def create_deck() -> tuple[Card, ...]:
     )
 
 
+def sort_hand(hand: Iterable[Card]) -> tuple[Card, ...]:
+    """Return a deterministic rank-first hand order."""
+    return tuple(sorted(hand, key=lambda card: (card.rank_index, card.color.value)))
+
+
 def create_initial_state(
     player_count: int,
     *,
@@ -64,7 +69,7 @@ def create_initial_state(
 
     players: list[PlayerState] = []
     for _ in range(player_count):
-        hand = tuple(_draw_from_list(deck, HAND_SIZE))
+        hand = sort_hand(_draw_from_list(deck, HAND_SIZE))
         players.append(PlayerState(hand=hand, loss_score=starting_loss_score))
 
     initial_card = deck.pop(0)
@@ -313,7 +318,7 @@ def _apply_refill(
 
     new_player = replace(
         player,
-        hand=tuple(hand),
+        hand=sort_hand(hand),
         negative_cards=tuple(negative_cards),
     )
     players = _replace_player(state.players, state.current_player_index, new_player)

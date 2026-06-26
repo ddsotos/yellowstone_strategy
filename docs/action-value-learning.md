@@ -520,6 +520,129 @@ observation construction does not simulate either plan again. Observation size
 increased from 66 to 68; older datasets and models are intentionally
 incompatible.
 
+### Sorted-Hand And Played-Rank Features
+
+Hands are now sorted by `rank_index, color` when cards are dealt or refilled.
+Observation construction keeps that state order and does not sort on every
+encoding call. This preserves a stable hand-slot representation without paying
+the sorting cost repeatedly during dataset collection and evaluation.
+
+The binary two-card observation also includes the ranks selected by the
+heuristic one-card and two-card plans:
+
+```text
+one_card_rank
+two_card_low_rank
+two_card_high_rank
+```
+
+The two-card ranks are stored in ascending order, independent of the actual
+play order. Observation size increased from 68 to 71; older two-card decision
+and advantage datasets/models are intentionally incompatible.
+
+Run 001 with the sorted-hand/rank observation collected new K=4 continuing
+datasets:
+
+```text
+train:      4,919 samples / 501 source seeds
+validation: 1,231 samples / 125 source seeds
+```
+
+The all-case advantage model stopped at epoch 8:
+
+```text
+validation MAE                    = 2.689
+validation RMSE                   = 3.888
+validation balanced sign accuracy = 0.5322
+heuristic sign accuracy            = 0.5256
+```
+
+Short continuing evaluation on 100 unused seeds starting at 2500000 did not
+show an improvement in `one_to_two_only` mode:
+
+```text
+threshold  p0 share  heuristic  paired delta  95% CI                 overrides
+0.35       0.262205  0.252590   +0.009616     [-0.005680, +0.024911]  919
+0.50       0.257870  0.252590   +0.005280     [-0.006919, +0.017480]  579
+0.75       0.255908  0.252590   +0.003319     [-0.007191, +0.013829]  170
+```
+
+A one-to-two filtered model trained only on
+`heuristic_stops_with_second_available` samples had weak balanced sign accuracy
+despite higher raw sign accuracy:
+
+```text
+train samples                     = 2,140
+validation samples                = 532
+best epoch                        = 14
+validation MAE                    = 3.343
+validation RMSE                   = 4.601
+validation sign accuracy          = 0.6184
+validation balanced sign accuracy = 0.5292
+heuristic sign accuracy            = 0.6090
+```
+
+It changed very few turns. Threshold `0.0` was slightly favorable on one 100
+seed batch but reversed on the next:
+
+```text
+seed start  threshold  p0 share  heuristic  paired delta  95% CI                 overrides
+2500000     0.00       0.248833  0.252590   -0.003757     [-0.014282, +0.006769]  44
+2600000     0.00       0.250580  0.249199   +0.001381     [-0.011361, +0.014122]  49
+```
+
+The sorted-hand/rank features are mechanically working, but this first small
+K=4 run is not a replacement for the previous original K=4
+`one_to_two_only / threshold=0.5` candidate. The next useful step is either to
+scale the new dataset to match the old 9,380-sample run before judging the
+feature, or to use the rank features for bucket diagnostics/gates instead of
+expecting the small supervised model to learn the full interaction.
+
+After checking the sorted-hand implementation, the continuing-game deck
+exhaustion refill path was found to bypass hand sorting. That path is used by
+the K=4 continuing data collector, so run 001 can include inconsistent hand
+orders after continuing refills. The refill path now applies the same
+`sort_hand` helper as normal game refill.
+
+Run 002 regenerated the same-size datasets with the corrected continuing
+refill:
+
+```text
+train:      4,919 samples / 501 source seeds
+validation: 1,231 samples / 125 source seeds
+```
+
+The all-case model remained weak:
+
+```text
+best epoch                        = 11
+validation MAE                    = 2.695
+validation RMSE                   = 3.882
+validation sign accuracy          = 0.5508
+validation balanced sign accuracy = 0.5261
+heuristic sign accuracy            = 0.5256
+```
+
+The one-to-two filtered model improved versus run 001 and now separates the
+validation target better than the heuristic sign baseline:
+
+```text
+train samples                     = 2,140
+validation samples                = 532
+best epoch                        = 14
+validation MAE                    = 3.327
+validation RMSE                   = 4.583
+validation sign accuracy          = 0.6391
+validation balanced sign accuracy = 0.5720
+heuristic sign accuracy            = 0.6090
+```
+
+This does not yet establish match-quality improvement, but it means the
+sorted-hand/rank feature path should not be dismissed based on run 001. The
+next check should evaluate the run 002 one-to-two model in continuing play,
+starting with threshold `0.0` and then small positive thresholds if override
+coverage is high enough.
+
 Run 001 collected 9,838 train samples from 1,001 seeds and 2,465 validation
 samples from a separate 250 seeds. The advantage model produced validation MAE
 `2.984`, RMSE `4.241`, and balanced sign accuracy `0.548`.

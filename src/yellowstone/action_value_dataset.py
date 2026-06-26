@@ -11,7 +11,7 @@ from random import Random
 from typing import Iterable
 
 from yellowstone.bots import BotPolicy, ExploratoryHeuristicBot, HeuristicBot
-from yellowstone.game import apply_known_legal_action, create_initial_state
+from yellowstone.game import apply_known_legal_action, create_initial_state, sort_hand
 from yellowstone.observation import OBSERVATION_SIZE, state_to_observation
 from yellowstone.observation_normalization import normalize_observation
 from yellowstone.policy_diagnostics import _heuristic_turn_action_index
@@ -399,7 +399,7 @@ def _apply_continuing_deck_refill(state: GameState, *, rng: Random) -> GameState
     for _ in range(min(draw_count, len(deck))):
         hand.append(deck.pop(0))
     players = list(state.players)
-    players[state.current_player_index] = replace(player, hand=tuple(hand))
+    players[state.current_player_index] = replace(player, hand=sort_hand(hand))
     return _continue_after_deck_exhaustion(
         replace(state, players=tuple(players), deck=tuple(deck)),
         rng=rng,

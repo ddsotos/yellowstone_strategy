@@ -10,6 +10,7 @@ from yellowstone.observation import (
     COLOR_ORDER,
     HEURISTIC_BONUS_OBSERVATION_SIZE,
     HEURISTIC_NEGATIVE_DELTA_OBSERVATION_SIZE,
+    HEURISTIC_PLAYED_RANK_OBSERVATION_SIZE,
     HAND_OBSERVATION_SIZE,
     HAND_SLOT_FEATURE_SIZE,
     OBSERVATION_SIZE,
@@ -49,6 +50,7 @@ def observation_high_values() -> tuple[int, ...]:
     values.extend([2] * OPPONENT_LAST_TURN_OBSERVATION_SIZE)
     values.extend([4] * HEURISTIC_BONUS_OBSERVATION_SIZE)
     values.extend([MAX_DECK_SIZE] * HEURISTIC_NEGATIVE_DELTA_OBSERVATION_SIZE)
+    values.extend([BOARD_SIZE - 1] * HEURISTIC_PLAYED_RANK_OBSERVATION_SIZE)
     values.extend(
         [
             MAX_DECK_BUCKET,
@@ -94,6 +96,9 @@ def observation_normalization_policy() -> dict[str, int | str]:
         "heuristic_bonus_observation_size": HEURISTIC_BONUS_OBSERVATION_SIZE,
         "heuristic_negative_delta_observation_size": (
             HEURISTIC_NEGATIVE_DELTA_OBSERVATION_SIZE
+        ),
+        "heuristic_played_rank_observation_size": (
+            HEURISTIC_PLAYED_RANK_OBSERVATION_SIZE
         ),
         "scalar_observation_size": SCALAR_OBSERVATION_SIZE,
     }
