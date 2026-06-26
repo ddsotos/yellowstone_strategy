@@ -643,6 +643,32 @@ next check should evaluate the run 002 one-to-two model in continuing play,
 starting with threshold `0.0` and then small positive thresholds if override
 coverage is high enough.
 
+The run 002 one-to-two filtered model was evaluated in continuing play with
+200 learner turns. On 100 seeds starting at 2500000, only threshold `0.0`
+showed a favorable direction:
+
+```text
+threshold  p0 share  heuristic  paired delta  95% CI                 overrides
+0.00       0.252195  0.256310   -0.004116     [-0.018360, +0.010129]  122
+0.25       0.258226  0.256310   +0.001915     [-0.010643, +0.014474]   71
+0.50       0.257330  0.256310   +0.001020     [-0.006940, +0.008980]   31
+0.75       0.255375  0.256310   -0.000936     [-0.005126, +0.003254]   13
+```
+
+That favorable direction did not reproduce on the next 100 seeds:
+
+```text
+threshold  seed start  p0 share  heuristic  paired delta  95% CI                 overrides
+0.00       2600000     0.250060  0.248696   +0.001364     [-0.014465, +0.017193]  121
+0.10       2600000     0.251076  0.248696   +0.002380     [-0.012051, +0.016812]  101
+```
+
+The corrected sorted-hand/rank model improves the one-to-two validation target
+but still does not reliably transfer to continuing loss share. Further
+threshold sweeps are lower priority. The next useful experiment should inspect
+the actual override set and evaluate simple, interpretable buckets or gates
+using the rank features together with immediate bonus/negative deltas.
+
 Run 001 collected 9,838 train samples from 1,001 seeds and 2,465 validation
 samples from a separate 250 seeds. The advantage model produced validation MAE
 `2.984`, RMSE `4.241`, and balanced sign accuracy `0.548`.

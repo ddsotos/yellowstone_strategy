@@ -502,3 +502,9 @@ validation lossを監視して最良重みを復元するearly stoppingと、複
 
 ### Codex回答
 修正後の `runs/two-card-rank-sorted-k4-run002/` を作成し、run001と同じ規模でtrain 4,919件・validation 1,231件を再生成した。全ケースAdvantageモデルはvalidation balanced sign accuracy 0.526で弱いままだったが、1→2専用モデルはvalidation sign accuracy 0.639、balanced sign accuracy 0.572、heuristic sign accuracy 0.609となり、run001のbalanced sign accuracy 0.529から改善した。次はrun002の1→2専用モデルを半無限評価で確認するのが妥当と判断した。
+
+### ユーザー入力
+2時間でどんどん進めるよう依頼した。
+
+### Codex回答
+run002の1→2専用モデルを半無限200 learner turnsで評価した。seed 2500000の100系列ではthreshold 0.0がpaired delta -0.00412で最良、0.25/0.5は悪化方向、0.75はほぼ中立だった。しかし別seed 2600000の100系列ではthreshold 0.0が+0.00136、0.1が+0.00238と悪化方向へ反転した。validation target改善は確認できたがcontinuing loss shareへは安定転移していないため、これ以上の閾値探索より、実際のoverride局面をrank特徴・即時ボーナス差・即時マイナス差でbucket化してgate検証する方針が妥当と判断した。
