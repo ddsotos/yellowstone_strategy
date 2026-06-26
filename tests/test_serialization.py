@@ -47,6 +47,7 @@ def test_game_state_round_trips_through_json_dict() -> None:
         cards_played_this_turn=2,
         winners=(1,),
         settlement_count=3,
+        last_turn_play_counts=(1, 2, 1, 0),
     )
 
     encoded = game_state_to_dict(state)

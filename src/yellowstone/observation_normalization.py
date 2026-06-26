@@ -3,14 +3,18 @@
 from __future__ import annotations
 
 from yellowstone.observation import (
-    BOARD_ANCHOR_FEATURE_SIZE,
-    BOARD_CELL_COUNT_FEATURE_SIZE,
+    BOARD_COLUMN_COUNT_FEATURE_SIZE,
+    BOARD_LEFT_COLUMN_FEATURE_SIZE,
     BOARD_OBSERVATION_SIZE,
+    BOARD_RANK_COUNT_FEATURE_SIZE,
     COLOR_ORDER,
+    HEURISTIC_BONUS_OBSERVATION_SIZE,
+    HEURISTIC_NEGATIVE_DELTA_OBSERVATION_SIZE,
     HAND_OBSERVATION_SIZE,
     HAND_SLOT_FEATURE_SIZE,
     OBSERVATION_SIZE,
     OBSERVED_PLAYER_COUNT,
+    OPPONENT_LAST_TURN_OBSERVATION_SIZE,
     PLAYER_FEATURE_SIZE,
     PLAYERS_OBSERVATION_SIZE,
     SCALAR_OBSERVATION_SIZE,
@@ -27,8 +31,9 @@ MAX_DECK_BUCKET = 3
 def observation_high_values() -> tuple[int, ...]:
     """Return per-feature upper bounds for raw integer observations."""
     values: list[int] = []
-    values.extend([BOARD_SIZE - 1] * BOARD_ANCHOR_FEATURE_SIZE)
-    values.extend([MAX_DECK_SIZE] * BOARD_CELL_COUNT_FEATURE_SIZE)
+    values.extend([MAX_DECK_SIZE] * BOARD_RANK_COUNT_FEATURE_SIZE)
+    values.extend([BOARD_SIZE - 1] * BOARD_LEFT_COLUMN_FEATURE_SIZE)
+    values.extend([MAX_DECK_SIZE] * BOARD_COLUMN_COUNT_FEATURE_SIZE)
     for _ in range(HAND_SIZE):
         values.append(1)
         values.extend([1] * len(COLOR_ORDER))
@@ -41,6 +46,9 @@ def observation_high_values() -> tuple[int, ...]:
                 MAX_OBSERVED_LOSS_SCORE,
             ]
         )
+    values.extend([2] * OPPONENT_LAST_TURN_OBSERVATION_SIZE)
+    values.extend([4] * HEURISTIC_BONUS_OBSERVATION_SIZE)
+    values.extend([MAX_DECK_SIZE] * HEURISTIC_NEGATIVE_DELTA_OBSERVATION_SIZE)
     values.extend(
         [
             MAX_DECK_BUCKET,
@@ -70,8 +78,9 @@ def observation_normalization_policy() -> dict[str, int | str]:
         "gym_api": "float32_normalized_by_default",
         "observation_size": OBSERVATION_SIZE,
         "board_observation_size": BOARD_OBSERVATION_SIZE,
-        "board_anchor_max": BOARD_SIZE - 1,
-        "board_cell_count_max": MAX_DECK_SIZE,
+        "board_rank_count_max": MAX_DECK_SIZE,
+        "board_left_column_max": BOARD_SIZE - 1,
+        "board_column_count_max": MAX_DECK_SIZE,
         "deck_bucket_max": MAX_DECK_BUCKET,
         "loss_score_clip_max": MAX_OBSERVED_LOSS_SCORE,
         "initial_loss_score": DEFAULT_LOSS_SCORE,
@@ -79,5 +88,12 @@ def observation_normalization_policy() -> dict[str, int | str]:
         "hand_observation_size": HAND_OBSERVATION_SIZE,
         "player_feature_size": PLAYER_FEATURE_SIZE,
         "players_observation_size": PLAYERS_OBSERVATION_SIZE,
+        "opponent_last_turn_play_counts_size": (
+            OPPONENT_LAST_TURN_OBSERVATION_SIZE
+        ),
+        "heuristic_bonus_observation_size": HEURISTIC_BONUS_OBSERVATION_SIZE,
+        "heuristic_negative_delta_observation_size": (
+            HEURISTIC_NEGATIVE_DELTA_OBSERVATION_SIZE
+        ),
         "scalar_observation_size": SCALAR_OBSERVATION_SIZE,
     }

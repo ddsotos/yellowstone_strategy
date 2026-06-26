@@ -107,6 +107,7 @@ def game_state_to_dict(state: GameState) -> JsonDict:
         "cards_played_this_turn": state.cards_played_this_turn,
         "winners": list(state.winners),
         "settlement_count": state.settlement_count,
+        "last_turn_play_counts": list(state.last_turn_play_counts),
     }
 
 
@@ -120,6 +121,9 @@ def game_state_from_dict(data: JsonDict) -> GameState:
         cards_played_this_turn=int(data["cards_played_this_turn"]),
         winners=tuple(int(winner) for winner in data["winners"]),
         settlement_count=int(data["settlement_count"]),
+        last_turn_play_counts=tuple(
+            int(count) for count in data.get("last_turn_play_counts", ())
+        ),
     )
 
 

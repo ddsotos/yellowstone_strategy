@@ -76,6 +76,7 @@ def create_initial_state(
         board=board,
         deck=tuple(deck),
         current_player_index=0,
+        last_turn_play_counts=tuple(0 for _ in players),
     )
 
 
@@ -353,6 +354,7 @@ def _settle_after_deck_exhaustion(
             phase=Phase.GAME_OVER,
             cards_played_this_turn=0,
             winners=game_winners,
+            last_turn_play_counts=_updated_last_turn_play_counts(state),
         )
 
     local_rng = rng if rng is not None else Random()
@@ -363,6 +365,7 @@ def _settle_after_deck_exhaustion(
         current_player_index=(state.current_player_index + 1) % len(state.players),
         phase=Phase.PLAY,
         cards_played_this_turn=0,
+        last_turn_play_counts=_updated_last_turn_play_counts(state),
     )
 
 
@@ -389,7 +392,20 @@ def _advance_to_next_player(state: GameState) -> GameState:
         current_player_index=(state.current_player_index + 1) % len(state.players),
         phase=Phase.PLAY,
         cards_played_this_turn=0,
+        last_turn_play_counts=_updated_last_turn_play_counts(state),
     )
+
+
+def _updated_last_turn_play_counts(state: GameState) -> tuple[int, ...]:
+    counts = list(_last_turn_play_counts(state))
+    counts[state.current_player_index] = state.cards_played_this_turn
+    return tuple(counts)
+
+
+def _last_turn_play_counts(state: GameState) -> tuple[int, ...]:
+    if len(state.last_turn_play_counts) == len(state.players):
+        return state.last_turn_play_counts
+    return tuple(0 for _ in state.players)
 
 
 def _positive_score_delta(

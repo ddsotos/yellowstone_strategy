@@ -101,6 +101,7 @@ class GameState:
     cards_played_this_turn: int = 0
     winners: tuple[int, ...] = ()
     settlement_count: int = 0
+    last_turn_play_counts: tuple[int, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)

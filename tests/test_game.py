@@ -130,6 +130,7 @@ def test_end_turn_advances_after_one_card() -> None:
     assert next_state.current_player_index == 1
     assert next_state.cards_played_this_turn == 0
     assert next_state.phase == Phase.PLAY
+    assert next_state.last_turn_play_counts == (1, 0, 0, 0)
 
 
 def test_end_turn_with_empty_hand_requires_refill_before_next_player() -> None:
@@ -174,6 +175,7 @@ def test_refill_after_one_card_empty_hand_advances_after_deck_draw() -> None:
     assert next_state.current_player_index == 1
     assert next_state.cards_played_this_turn == 0
     assert next_state.phase == Phase.PLAY
+    assert next_state.last_turn_play_counts == (1, 0, 0, 0)
 
 
 def test_end_turn_with_empty_hand_can_recover_from_negative_cards() -> None:
@@ -215,6 +217,7 @@ def test_refill_none_advances_after_two_cards() -> None:
     assert next_state.current_player_index == 1
     assert next_state.cards_played_this_turn == 0
     assert next_state.phase == Phase.PLAY
+    assert next_state.last_turn_play_counts == (2, 0, 0, 0)
 
 
 def test_refill_deck_exhaustion_settles_negative_cards() -> None:

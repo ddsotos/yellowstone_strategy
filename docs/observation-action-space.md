@@ -15,28 +15,29 @@ state_to_observation(state: GameState) -> tuple[int, ...]
 observation_metadata() -> dict[str, int]
 ```
 
-観測長は `OBSERVATION_SIZE` で固定する。2026-06-15 時点では `61`。
+観測長は `OBSERVATION_SIZE` で固定する。2026-06-21 時点では `68`。
 
 内訳:
 
-1. 盤面: `2 + 3 * 3 = 11`
+1. 盤面: `7 + 1 + 3 = 11`
 2. 現在プレイヤーの手札: `6 * 6 = 36`
 3. プレイヤー概要: `4 * 3 = 12`
-4. スカラー: `2`
+4. 相手3人の直前ターンのプレイ枚数: `3`
+5. 1枚案・2枚案の即時ボーナス点: `2`
+6. 1枚案・2枚案の即時マイナス増加量: `2`
+7. スカラー: `2`
 
 ### 盤面
 
-盤面は、現在置かれているカードがすべて収まる3x3範囲に圧縮して表す。
-
-先頭2値は以下:
+盤面は以下の11値で表す。
 
 ```text
-min_rank_index, min_x
+rank_counts[7]
+left_column_index
+left_center_right_column_counts[3]
 ```
 
-`min_rank_index` は盤面にある中で一番小さい数字に対応する `y`、`min_x` は盤面にある中で一番左の列番号として扱う。この2値から、盤面カードが収まる3x3範囲を決める。盤面が空の場合はどちらも0にする。
-
-続く9値は、3x3範囲内の各マスにあるカード総数。走査順は `y=min_rank_index..min_rank_index+2`、各行で `x=min_x..min_x+2`。
+`rank_counts` は数字ごとの盤面カード総数、`left_column_index` は一番左の列番号、最後の3値は左・中央・右列ごとのカード総数。盤面が空の場合はすべて0にする。
 
 盤面には赤・青・緑・黄という絶対色を入れない。色は手札側で相対色one-hotとして表す。
 
@@ -68,6 +69,9 @@ hand_count, negative_card_count, loss_score
 
 ### その他
 
+- 相手の直前ターン枚数: 現在プレイヤーから順に次の3人
+- heuristic即時ボーナス: `one_card_bonus`, `two_card_bonus`
+- heuristic即時マイナス増加: `one_card_negative_delta`, `two_card_negative_delta`
 - スカラー: `deck_bucket`, `settlement_count`
 
 `deck_bucket` は山札枚数を以下の4段階に丸める。

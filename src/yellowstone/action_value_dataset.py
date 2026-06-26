@@ -428,6 +428,7 @@ def _continue_after_deck_exhaustion(state: GameState, *, rng: Random) -> GameSta
         cards_played_this_turn=0,
         winners=(),
         settlement_count=state.settlement_count + 1,
+        last_turn_play_counts=_updated_last_turn_play_counts(state),
     )
 
 
@@ -447,12 +448,14 @@ def _continue_after_game_over(state: GameState, *, rng: Random) -> GameState:
             phase=Phase.PLAY,
             winners=(),
             cards_played_this_turn=0,
+            last_turn_play_counts=_updated_last_turn_play_counts(state),
         )
     return replace(
         state,
         phase=Phase.PLAY,
         winners=(),
         cards_played_this_turn=0,
+        last_turn_play_counts=_updated_last_turn_play_counts(state),
     )
 
 
@@ -462,6 +465,18 @@ def _is_learner_turn_start(state: GameState, learning_player_index: int) -> bool
         and state.current_player_index == learning_player_index
         and state.cards_played_this_turn == 0
     )
+
+
+def _updated_last_turn_play_counts(state: GameState) -> tuple[int, ...]:
+    counts = list(_last_turn_play_counts(state))
+    counts[state.current_player_index] = state.cards_played_this_turn
+    return tuple(counts)
+
+
+def _last_turn_play_counts(state: GameState) -> tuple[int, ...]:
+    if len(state.last_turn_play_counts) == len(state.players):
+        return state.last_turn_play_counts
+    return tuple(0 for _ in state.players)
 
 
 def _sample_to_dict(sample: ActionValueSample) -> dict[str, object]:

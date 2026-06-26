@@ -1,7 +1,10 @@
 from yellowstone.observation import (
     BOARD_OBSERVATION_SIZE,
+    HEURISTIC_BONUS_OBSERVATION_SIZE,
+    HEURISTIC_NEGATIVE_DELTA_OBSERVATION_SIZE,
     HAND_OBSERVATION_SIZE,
     OBSERVATION_SIZE,
+    OPPONENT_LAST_TURN_OBSERVATION_SIZE,
     PLAYERS_OBSERVATION_SIZE,
     observation_metadata,
     state_to_observation,
@@ -43,15 +46,15 @@ def test_state_to_observation_encodes_compressed_board_counts() -> None:
     observation = state_to_observation(state)
 
     assert observation[:BOARD_OBSERVATION_SIZE] == (
-        2,
-        1,
+        0,
+        0,
         3,
         0,
         0,
         0,
         0,
-        0,
-        0,
+        1,
+        3,
         0,
         0,
     )
@@ -145,7 +148,17 @@ def test_state_to_observation_encodes_players_and_scalars() -> None:
 
     observation = state_to_observation(state)
     player_start = BOARD_OBSERVATION_SIZE + HAND_OBSERVATION_SIZE
-    scalar_start = player_start + PLAYERS_OBSERVATION_SIZE
+    opponent_last_turn_start = player_start + PLAYERS_OBSERVATION_SIZE
+    heuristic_bonus_start = (
+        opponent_last_turn_start + OPPONENT_LAST_TURN_OBSERVATION_SIZE
+    )
+    heuristic_negative_delta_start = (
+        heuristic_bonus_start + HEURISTIC_BONUS_OBSERVATION_SIZE
+    )
+    scalar_start = (
+        heuristic_negative_delta_start
+        + HEURISTIC_NEGATIVE_DELTA_OBSERVATION_SIZE
+    )
 
     assert observation[player_start : player_start + 12] == (
         1,
@@ -161,4 +174,117 @@ def test_state_to_observation_encodes_players_and_scalars() -> None:
         0,
         5,
     )
+    assert (
+        observation[
+            opponent_last_turn_start
+            : opponent_last_turn_start + OPPONENT_LAST_TURN_OBSERVATION_SIZE
+        ]
+        == (0, 0, 0)
+    )
+    assert (
+        observation[
+            heuristic_bonus_start
+            : heuristic_bonus_start + HEURISTIC_BONUS_OBSERVATION_SIZE
+        ]
+        == (0, 0)
+    )
+    assert (
+        observation[
+            heuristic_negative_delta_start
+            : heuristic_negative_delta_start
+            + HEURISTIC_NEGATIVE_DELTA_OBSERVATION_SIZE
+        ]
+        == (0, 0)
+    )
     assert observation[scalar_start : scalar_start + 2] == (2, 3)
+
+
+def test_state_to_observation_encodes_opponent_last_turn_counts() -> None:
+    # 相手3人の直前ターンのプレイ枚数が現在プレイヤーからの相対順で入る。
+    state = GameState(
+        players=(PlayerState(), PlayerState(), PlayerState(), PlayerState()),
+        current_player_index=2,
+        last_turn_play_counts=(2, 1, 0, 2),
+    )
+
+    observation = state_to_observation(state)
+    start = BOARD_OBSERVATION_SIZE + HAND_OBSERVATION_SIZE + PLAYERS_OBSERVATION_SIZE
+
+    assert observation[start : start + OPPONENT_LAST_TURN_OBSERVATION_SIZE] == (
+        2,
+        2,
+        1,
+    )
+
+
+def test_state_to_observation_encodes_heuristic_turn_bonus_scores() -> None:
+    # heuristicの1枚出し/2枚出しで得られる即時ボーナス点を入れる。
+    state = GameState(
+        players=(
+            PlayerState(hand=(Card(Color.BLUE, 2), Card(Color.GREEN, 2))),
+            PlayerState(),
+            PlayerState(),
+            PlayerState(),
+        ),
+        board={
+            Position(0, 0): (Card(Color.RED, 0),),
+            Position(1, 0): (Card(Color.GREEN, 0),),
+            Position(2, 0): (Card(Color.BLUE, 0),),
+            Position(0, 1): (Card(Color.RED, 1),),
+            Position(1, 1): (Card(Color.GREEN, 1),),
+            Position(2, 1): (Card(Color.BLUE, 1),),
+            Position(0, 2): (Card(Color.RED, 2),),
+        },
+    )
+
+    observation = state_to_observation(state)
+    start = (
+        BOARD_OBSERVATION_SIZE
+        + HAND_OBSERVATION_SIZE
+        + PLAYERS_OBSERVATION_SIZE
+        + OPPONENT_LAST_TURN_OBSERVATION_SIZE
+    )
+
+    assert observation[start : start + HEURISTIC_BONUS_OBSERVATION_SIZE] == (1, 4)
+
+
+def test_state_to_observation_accepts_precomputed_heuristic_bonuses() -> None:
+    # 事前計算した一枚・二枚のボーナス点を観測へそのまま利用できる。
+    state = GameState(
+        players=(PlayerState(), PlayerState(), PlayerState(), PlayerState())
+    )
+
+    observation = state_to_observation(state, heuristic_bonuses=(3, 4))
+    start = (
+        BOARD_OBSERVATION_SIZE
+        + HAND_OBSERVATION_SIZE
+        + PLAYERS_OBSERVATION_SIZE
+        + OPPONENT_LAST_TURN_OBSERVATION_SIZE
+    )
+
+    assert observation[start : start + HEURISTIC_BONUS_OBSERVATION_SIZE] == (3, 4)
+
+
+def test_state_to_observation_accepts_precomputed_negative_deltas() -> None:
+    # 1枚案・2枚案の即時マイナス増加量を観測へそのまま利用できる。
+    state = GameState(
+        players=(PlayerState(), PlayerState(), PlayerState(), PlayerState())
+    )
+
+    observation = state_to_observation(
+        state,
+        heuristic_bonuses=(0, 0),
+        heuristic_negative_deltas=(2, 5),
+    )
+    start = (
+        BOARD_OBSERVATION_SIZE
+        + HAND_OBSERVATION_SIZE
+        + PLAYERS_OBSERVATION_SIZE
+        + OPPONENT_LAST_TURN_OBSERVATION_SIZE
+        + HEURISTIC_BONUS_OBSERVATION_SIZE
+    )
+
+    assert (
+        observation[start : start + HEURISTIC_NEGATIVE_DELTA_OBSERVATION_SIZE]
+        == (2, 5)
+    )

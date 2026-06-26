@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from yellowstone.heuristic_turn_plan import heuristic_turn_features
 from yellowstone.types import (
     FRAME_SIZE,
     HAND_SIZE,
@@ -17,26 +18,51 @@ RELATIVE_COLOR_FEATURE_SIZE = len(COLOR_ORDER)
 HAND_SLOT_FEATURE_SIZE = 1 + RELATIVE_COLOR_FEATURE_SIZE + 1
 OBSERVED_PLAYER_COUNT = 4
 PLAYER_FEATURE_SIZE = 3
-BOARD_ANCHOR_FEATURE_SIZE = 2
-BOARD_CELL_COUNT_FEATURE_SIZE = FRAME_SIZE * FRAME_SIZE
-BOARD_OBSERVATION_SIZE = BOARD_ANCHOR_FEATURE_SIZE + BOARD_CELL_COUNT_FEATURE_SIZE
+BOARD_RANK_COUNT_FEATURE_SIZE = 7
+BOARD_LEFT_COLUMN_FEATURE_SIZE = 1
+BOARD_COLUMN_COUNT_FEATURE_SIZE = FRAME_SIZE
+BOARD_OBSERVATION_SIZE = (
+    BOARD_RANK_COUNT_FEATURE_SIZE
+    + BOARD_LEFT_COLUMN_FEATURE_SIZE
+    + BOARD_COLUMN_COUNT_FEATURE_SIZE
+)
 HAND_OBSERVATION_SIZE = HAND_SIZE * HAND_SLOT_FEATURE_SIZE
 PLAYERS_OBSERVATION_SIZE = OBSERVED_PLAYER_COUNT * PLAYER_FEATURE_SIZE
+OPPONENT_LAST_TURN_OBSERVATION_SIZE = OBSERVED_PLAYER_COUNT - 1
+HEURISTIC_BONUS_OBSERVATION_SIZE = 2
+HEURISTIC_NEGATIVE_DELTA_OBSERVATION_SIZE = 2
 SCALAR_OBSERVATION_SIZE = 2
 OBSERVATION_SIZE = (
     BOARD_OBSERVATION_SIZE
     + HAND_OBSERVATION_SIZE
     + PLAYERS_OBSERVATION_SIZE
+    + OPPONENT_LAST_TURN_OBSERVATION_SIZE
+    + HEURISTIC_BONUS_OBSERVATION_SIZE
+    + HEURISTIC_NEGATIVE_DELTA_OBSERVATION_SIZE
     + SCALAR_OBSERVATION_SIZE
 )
 
 
-def state_to_observation(state: GameState) -> tuple[int, ...]:
+def state_to_observation(
+    state: GameState,
+    *,
+    heuristic_bonuses: tuple[int, int] | None = None,
+    heuristic_negative_deltas: tuple[int, int] | None = None,
+) -> tuple[int, ...]:
     """Encode a state as a fixed-length integer tuple."""
     values: list[int] = []
     values.extend(_board_features(state))
     values.extend(_current_hand_features(state))
     values.extend(_player_features(state))
+    values.extend(_opponent_last_turn_play_count_features(state))
+    if heuristic_bonuses is None or heuristic_negative_deltas is None:
+        turn_features = heuristic_turn_features(state)
+        if heuristic_bonuses is None:
+            heuristic_bonuses = turn_features[:2]
+        if heuristic_negative_deltas is None:
+            heuristic_negative_deltas = turn_features[2:]
+    values.extend(heuristic_bonuses)
+    values.extend(heuristic_negative_deltas)
     values.extend(
         [
             _deck_bucket(len(state.deck)),
@@ -55,17 +81,28 @@ def observation_metadata() -> dict[str, int]:
         "board_size": BOARD_OBSERVATION_SIZE,
         "hand_size": HAND_OBSERVATION_SIZE,
         "players_size": PLAYERS_OBSERVATION_SIZE,
+        "opponent_last_turn_play_counts_size": (
+            OPPONENT_LAST_TURN_OBSERVATION_SIZE
+        ),
+        "heuristic_bonus_size": HEURISTIC_BONUS_OBSERVATION_SIZE,
+        "heuristic_negative_delta_size": (
+            HEURISTIC_NEGATIVE_DELTA_OBSERVATION_SIZE
+        ),
         "scalar_size": SCALAR_OBSERVATION_SIZE,
     }
 
 
 def _board_features(state: GameState) -> list[int]:
-    anchor = _board_anchor(state)
-    values: list[int] = [anchor.y, anchor.x]
-    for y in range(anchor.y, anchor.y + FRAME_SIZE):
-        for x in range(anchor.x, anchor.x + FRAME_SIZE):
-            values.append(len(state.board.get(Position(x=x, y=y), ())))
-    return values
+    left_x = _board_left_column(state)
+    rank_counts = [0] * BOARD_RANK_COUNT_FEATURE_SIZE
+    column_counts = [0] * BOARD_COLUMN_COUNT_FEATURE_SIZE
+    for position, stack in state.board.items():
+        if 0 <= position.y < len(rank_counts):
+            rank_counts[position.y] += len(stack)
+        relative_x = position.x - left_x
+        if 0 <= relative_x < len(column_counts):
+            column_counts[relative_x] += len(stack)
+    return [*rank_counts, left_x, *column_counts]
 
 
 def _board_anchor(state: GameState) -> Position:
@@ -74,6 +111,12 @@ def _board_anchor(state: GameState) -> Position:
     min_x = min(position.x for position in state.board)
     min_y = min(position.y for position in state.board)
     return Position(x=min_x, y=min_y)
+
+
+def _board_left_column(state: GameState) -> int:
+    if not state.board:
+        return 0
+    return min(position.x for position in state.board)
 
 
 def _current_hand_features(state: GameState) -> list[int]:
@@ -111,6 +154,20 @@ def _player_features(state: GameState) -> list[int]:
         else:
             values.extend([0] * PLAYER_FEATURE_SIZE)
     return values
+
+
+def _opponent_last_turn_play_count_features(state: GameState) -> list[int]:
+    counts = _last_turn_play_counts(state)
+    return [
+        counts[(state.current_player_index + offset) % len(state.players)]
+        for offset in range(1, min(len(state.players), OBSERVED_PLAYER_COUNT))
+    ]
+
+
+def _last_turn_play_counts(state: GameState) -> tuple[int, ...]:
+    if len(state.last_turn_play_counts) == len(state.players):
+        return state.last_turn_play_counts
+    return tuple(0 for _ in state.players)
 
 
 def _deck_bucket(deck_count: int) -> int:
