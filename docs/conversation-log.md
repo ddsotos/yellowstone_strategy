@@ -508,3 +508,9 @@ validation lossを監視して最良重みを復元するearly stoppingと、複
 
 ### Codex回答
 run002の1→2専用モデルを半無限200 learner turnsで評価した。seed 2500000の100系列ではthreshold 0.0がpaired delta -0.00412で最良、0.25/0.5は悪化方向、0.75はほぼ中立だった。しかし別seed 2600000の100系列ではthreshold 0.0が+0.00136、0.1が+0.00238と悪化方向へ反転した。validation target改善は確認できたがcontinuing loss shareへは安定転移していないため、これ以上の閾値探索より、実際のoverride局面をrank特徴・即時ボーナス差・即時マイナス差でbucket化してgate検証する方針が妥当と判断した。
+
+### ユーザー入力
+2時間で進めるよう依頼した。
+
+### Codex回答
+`two_card_advantage_diagnostics` に1→2 override bucket診断を追加し、validation上で即時ボーナス差、即時マイナス差、手札枚数、出すrankごとのtarget改善を集計できるようにした。run002の1→2専用モデルでは `hand_count=6` がchanged 63、accuracy 0.651、平均target改善 +0.578で有望に見えた一方、`hand_count=5` は-1.625で悪かった。そこで `hand_count>=6` gateを評価へ追加して半無限A/Bしたが、seed 2500000ではpaired delta -0.00341、seed 2600000では+0.00269と再現しなかった。単一bucket gateでは弱く、次は複合bucketまたは実戦overrideログ由来の分類が必要と判断した。

@@ -669,6 +669,39 @@ threshold sweeps are lower priority. The next useful experiment should inspect
 the actual override set and evaluate simple, interpretable buckets or gates
 using the rank features together with immediate bonus/negative deltas.
 
+### Sorted-Rank Override Bucket Diagnostics
+
+`two_card_advantage_diagnostics` now supports one-to-two override bucket
+diagnostics. It groups predicted one-to-two changes by immediate bonus
+difference, immediate negative-card difference, hand count, and played ranks.
+
+For the run 002 one-to-two model at threshold `0.0`, validation-set override
+buckets showed:
+
+```text
+bucket                         changed  accuracy  mean target improvement/change
+hand_count=6                   63       0.651     +0.578
+hand_count=5                   30       0.433     -1.625
+negative_diff=1                23       0.565     -1.084
+negative_diff=2+               67       0.612     +0.144
+one_card_rank=5                18       0.778     +1.438
+one_card_rank=4                21       0.429     -1.548
+```
+
+This made `hand_count >= 6` look like a plausible first gate, but continuing
+evaluation did not confirm it:
+
+```text
+threshold  gate          seed start  p0 share  heuristic  paired delta  95% CI                 overrides
+0.00       hand_count>=6 2500000     0.252897  0.256310   -0.003413     [-0.015655, +0.008828]  81
+0.00       hand_count>=6 2600000     0.251382  0.248696   +0.002686     [-0.012516, +0.017888]  83
+```
+
+The single hand-count gate is therefore not reliable enough. The bucket
+diagnostic is useful, but the next gate should be based on a more specific
+combination, such as hand count plus rank and negative-diff buckets, or on
+actual continuing override logs rather than validation-target buckets alone.
+
 Run 001 collected 9,838 train samples from 1,001 seeds and 2,465 validation
 samples from a separate 250 seeds. The advantage model produced validation MAE
 `2.984`, RMSE `4.241`, and balanced sign accuracy `0.548`.

@@ -26,6 +26,15 @@ def test_advantage_bot_rejects_unknown_policy_mode(tmp_path) -> None:
         )
 
 
+def test_advantage_bot_rejects_invalid_min_hand_count(tmp_path) -> None:
+    # 1→2 gateの手札枚数条件は0..6だけを受け付ける。
+    with pytest.raises(ValueError):
+        LearnedTwoCardAdvantageBot(
+            model_path=tmp_path / "model.pt",
+            one_to_two_min_hand_count=7,
+        )
+
+
 def test_advantage_bot_accepts_always_one_to_two_mode(tmp_path) -> None:
     # モデル選別なしの1枚→2枚baselineを評価モードとして指定できる。
     bot = LearnedTwoCardAdvantageBot(
@@ -57,6 +66,7 @@ def test_continuing_advantage_result_serializes_loss_deltas() -> None:
         policy_mode="one_to_two_only",
         confirmation_model_path=None,
         confirmation_advantage_threshold=None,
+        one_to_two_min_hand_count=6,
         directional_override_count=10,
         paired_p0_loss_share_deltas=(-0.02, 0.0),
         paired_p0_loss_share_delta=-0.01,
@@ -75,6 +85,7 @@ def test_continuing_advantage_result_serializes_loss_deltas() -> None:
     )
     assert data["policy_mode"] == "one_to_two_only"
     assert data["confirmation_model_path"] is None
+    assert data["one_to_two_min_hand_count"] == 6
     assert data["directional_override_count"] == 10
     assert data["paired_p0_loss_share_deltas"] == (-0.02, 0.0)
     assert data["paired_p0_loss_share_delta"] == -0.01
