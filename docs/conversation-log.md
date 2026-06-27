@@ -526,3 +526,9 @@ run002の1→2専用モデルを半無限200 learner turnsで評価した。seed
 
 ### Codex回答
 評価CLIへ `--one-to-two-hand-count` の完全一致gateを追加し、同じ未使用seed 2700000の300系列で確認した。`hand_count=5` はp0 share 0.254232対heuristic 0.254282、paired delta -0.000049、95%CI [-0.007850, +0.007751]、overrides 172で実質中立だった。`hand_count=4` はp0 share 0.255355対heuristic 0.254282、paired delta +0.001073、95%CI [-0.001647, +0.003792]、overrides 15で、変更数が少なく悪化寄りだった。手札枚数だけのgateは単独では有望ではないと判断した。
+
+### ユーザー入力
+データ量不足を疑っており、3時間以上かけてもよいので学習を追加してほしいと依頼した。
+
+### Codex回答
+追加K=4 continuing trainデータ9,801件をseed 2800000から生成し、run002の4,919件と合わせて14,720件で再学習した。1→2専用の学習対象は6,541件になった。固定validationではMAE 3.277、RMSE 4.524と少し改善したが、balanced sign accuracyは0.5507でrun002の0.572より低下した。半無限300系列ではp0 share 0.258176対heuristic 0.254282、paired delta +0.003894、95%CI [-0.005585, +0.013374]、overrides 428で悪化方向だった。現仕様では単純なデータ増量だけでは改善せず、target/特徴のcontinuing整合や実戦override診断が課題と判断した。

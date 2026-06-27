@@ -727,6 +727,43 @@ threshold  gate          seed start  p0 share  heuristic  paired delta  95% CI  
 coverage while leaning unfavorable. Hand-count-only gates are not a useful
 direction by themselves.
 
+### Sorted-Rank Data Scaling Run 003
+
+To test whether the sorted-hand/rank model was mainly data-limited, run 003
+added another K=4 continuing training file:
+
+```text
+extra train: 9,801 samples / 1,001 source seeds
+combined train with run 002: 14,720 samples
+fixed validation: 1,231 samples / 125 source seeds
+```
+
+The one-to-two filtered training subset increased to 6,541 samples. The model
+improved magnitude errors slightly but did not improve balanced sign accuracy
+against the same fixed validation set:
+
+```text
+best epoch                        = 9
+validation MAE                    = 3.277
+validation RMSE                   = 4.524
+validation sign accuracy          = 0.6184
+validation balanced sign accuracy = 0.5507
+heuristic sign accuracy            = 0.6090
+```
+
+Continuing evaluation also did not improve. On the same 300-seed batch used for
+the hand-count gates:
+
+```text
+model                         threshold  seed start  p0 share  heuristic  paired delta  95% CI                 overrides
+run003 one-to-two scaled       0.00       2700000     0.258176  0.254282   +0.003894     [-0.005585, +0.013374]  428
+```
+
+This suggests that simply adding more samples for the current four-turn K=4
+target and sorted-rank observation is not enough. The remaining issue is more
+likely target/feature alignment with continuing play, or the need for
+continuing-policy override diagnostics rather than validation-target buckets.
+
 Run 001 collected 9,838 train samples from 1,001 seeds and 2,465 validation
 samples from a separate 250 seeds. The advantage model produced validation MAE
 `2.984`, RMSE `4.241`, and balanced sign accuracy `0.548`.
