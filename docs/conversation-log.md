@@ -514,3 +514,9 @@ run002の1→2専用モデルを半無限200 learner turnsで評価した。seed
 
 ### Codex回答
 `two_card_advantage_diagnostics` に1→2 override bucket診断を追加し、validation上で即時ボーナス差、即時マイナス差、手札枚数、出すrankごとのtarget改善を集計できるようにした。run002の1→2専用モデルでは `hand_count=6` がchanged 63、accuracy 0.651、平均target改善 +0.578で有望に見えた一方、`hand_count=5` は-1.625で悪かった。そこで `hand_count>=6` gateを評価へ追加して半無限A/Bしたが、seed 2500000ではpaired delta -0.00341、seed 2600000では+0.00269と再現しなかった。単一bucket gateでは弱く、次は複合bucketまたは実戦overrideログ由来の分類が必要と判断した。
+
+### ユーザー入力
+試行回数が少なすぎるため、もっと増やして検証できるか質問した。
+
+### Codex回答
+`hand_count>=6` gateを未使用seed 2700000の300系列へ拡大した。結果はp0 share 0.258277対heuristic 0.254282、paired delta +0.003996、95%CI [-0.004817, +0.012808]、overrides 227で悪化方向だった。単一の手札枚数gateは落とし、今後は複合bucketまたはcontinuing実戦overrideログからgateを作るべきと判断した。

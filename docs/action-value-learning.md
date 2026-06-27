@@ -702,6 +702,18 @@ diagnostic is useful, but the next gate should be based on a more specific
 combination, such as hand count plus rank and negative-diff buckets, or on
 actual continuing override logs rather than validation-target buckets alone.
 
+A larger 300-seed confirmation for the same gate was unfavorable:
+
+```text
+threshold  gate          seed start  p0 share  heuristic  paired delta  95% CI                 overrides
+0.00       hand_count>=6 2700000     0.258277  0.254282   +0.003996     [-0.004817, +0.012808]  227
+```
+
+This is enough to drop the single `hand_count >= 6` gate. The validation-target
+bucket was over-optimistic, so future gates should be tested as combinations
+and preferably derived from buckets observed in continuing-policy overrides,
+not only from the supervised validation dataset.
+
 Run 001 collected 9,838 train samples from 1,001 seeds and 2,465 validation
 samples from a separate 250 seeds. The advantage model produced validation MAE
 `2.984`, RMSE `4.241`, and balanced sign accuracy `0.548`.
