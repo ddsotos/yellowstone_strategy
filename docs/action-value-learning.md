@@ -714,6 +714,19 @@ bucket was over-optimistic, so future gates should be tested as combinations
 and preferably derived from buckets observed in continuing-policy overrides,
 not only from the supervised validation dataset.
 
+Exact hand-count gates for `5` and `4` were also checked on the same 300-seed
+batch:
+
+```text
+threshold  gate          seed start  p0 share  heuristic  paired delta  95% CI                 overrides
+0.00       hand_count=5  2700000     0.254232  0.254282   -0.000049     [-0.007850, +0.007751]  172
+0.00       hand_count=4  2700000     0.255355  0.254282   +0.001073     [-0.001647, +0.003792]   15
+```
+
+`hand_count=5` is effectively neutral and `hand_count=4` has too little
+coverage while leaning unfavorable. Hand-count-only gates are not a useful
+direction by themselves.
+
 Run 001 collected 9,838 train samples from 1,001 seeds and 2,465 validation
 samples from a separate 250 seeds. The advantage model produced validation MAE
 `2.984`, RMSE `4.241`, and balanced sign accuracy `0.548`.

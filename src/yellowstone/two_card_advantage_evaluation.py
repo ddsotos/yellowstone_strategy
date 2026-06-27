@@ -41,6 +41,7 @@ class LearnedTwoCardAdvantageBot:
     confirmation_model_path: Path | None = None
     confirmation_advantage_threshold: float | None = None
     one_to_two_min_hand_count: int | None = None
+    one_to_two_hand_count: int | None = None
     pending_actions: tuple[Action, ...] = ()
     decision_count: int = 0
     two_card_decision_count: int = 0
@@ -60,6 +61,11 @@ class LearnedTwoCardAdvantageBot:
             and not 0 <= self.one_to_two_min_hand_count <= 6
         ):
             raise ValueError("one_to_two_min_hand_count must be 0..6")
+        if (
+            self.one_to_two_hand_count is not None
+            and not 0 <= self.one_to_two_hand_count <= 6
+        ):
+            raise ValueError("one_to_two_hand_count must be 0..6")
         if self.policy_mode not in (
             "unrestricted",
             "one_to_two_only",
@@ -121,11 +127,18 @@ class LearnedTwoCardAdvantageBot:
             confirmation_two = confirmation_advantage > confirmation_threshold
             model_two = model_two and confirmation_two
         if self.policy_mode != "unrestricted":
+            hand_count = len(state.players[state.current_player_index].hand)
             if (
                 self.policy_mode in ("one_to_two_only", "one_to_two_always")
                 and self.one_to_two_min_hand_count is not None
-                and len(state.players[state.current_player_index].hand)
-                < self.one_to_two_min_hand_count
+                and hand_count < self.one_to_two_min_hand_count
+            ):
+                self.heuristic_fallback_count += 1
+                return HeuristicBot().choose_action(state)
+            if (
+                self.policy_mode in ("one_to_two_only", "one_to_two_always")
+                and self.one_to_two_hand_count is not None
+                and hand_count != self.one_to_two_hand_count
             ):
                 self.heuristic_fallback_count += 1
                 return HeuristicBot().choose_action(state)
@@ -184,6 +197,7 @@ class ContinuingTwoCardAdvantageEvaluationResult:
     confirmation_model_path: str | None
     confirmation_advantage_threshold: float | None
     one_to_two_min_hand_count: int | None
+    one_to_two_hand_count: int | None
     directional_override_count: int
     paired_p0_loss_share_deltas: tuple[float, ...]
     paired_p0_loss_share_delta: float
@@ -237,6 +251,7 @@ def evaluate_two_card_advantage_model_continuing(
     confirmation_model_path: Path | None = None,
     confirmation_advantage_threshold: float | None = None,
     one_to_two_min_hand_count: int | None = None,
+    one_to_two_hand_count: int | None = None,
 ) -> ContinuingTwoCardAdvantageEvaluationResult:
     """Evaluate the binary policy for a fixed number of continuing turns."""
     if not seeds:
@@ -256,6 +271,7 @@ def evaluate_two_card_advantage_model_continuing(
             confirmation_model_path=confirmation_model_path,
             confirmation_advantage_threshold=confirmation_advantage_threshold,
             one_to_two_min_hand_count=one_to_two_min_hand_count,
+            one_to_two_hand_count=one_to_two_hand_count,
         )
         model_results.append(
             _run_continuing_match(
@@ -309,6 +325,7 @@ def evaluate_two_card_advantage_model_continuing(
         ),
         confirmation_advantage_threshold=confirmation_advantage_threshold,
         one_to_two_min_hand_count=one_to_two_min_hand_count,
+        one_to_two_hand_count=one_to_two_hand_count,
         directional_override_count=directional_override_count,
         paired_p0_loss_share_deltas=paired_deltas,
         paired_p0_loss_share_delta=paired_delta,
@@ -375,6 +392,7 @@ def continuing_evaluation_result_to_dict(
         "confirmation_model_path": result.confirmation_model_path,
         "confirmation_advantage_threshold": result.confirmation_advantage_threshold,
         "one_to_two_min_hand_count": result.one_to_two_min_hand_count,
+        "one_to_two_hand_count": result.one_to_two_hand_count,
         "directional_override_count": result.directional_override_count,
         "paired_p0_loss_share_deltas": result.paired_p0_loss_share_deltas,
         "paired_p0_loss_share_delta": result.paired_p0_loss_share_delta,
@@ -406,6 +424,7 @@ def main() -> None:
     parser.add_argument("--confirmation-model-path", type=Path)
     parser.add_argument("--confirmation-advantage-threshold", type=float)
     parser.add_argument("--one-to-two-min-hand-count", type=int)
+    parser.add_argument("--one-to-two-hand-count", type=int)
     args = parser.parse_args()
     seeds = tuple(range(args.seed_start, args.seed_start + args.games))
     if args.continuing_learner_turns is None:
@@ -427,6 +446,7 @@ def main() -> None:
             confirmation_model_path=args.confirmation_model_path,
             confirmation_advantage_threshold=args.confirmation_advantage_threshold,
             one_to_two_min_hand_count=args.one_to_two_min_hand_count,
+            one_to_two_hand_count=args.one_to_two_hand_count,
         )
         result_dict = continuing_evaluation_result_to_dict(continuing_result)
     if args.json_output is not None:

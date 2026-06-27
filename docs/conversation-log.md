@@ -520,3 +520,9 @@ run002の1→2専用モデルを半無限200 learner turnsで評価した。seed
 
 ### Codex回答
 `hand_count>=6` gateを未使用seed 2700000の300系列へ拡大した。結果はp0 share 0.258277対heuristic 0.254282、paired delta +0.003996、95%CI [-0.004817, +0.012808]、overrides 227で悪化方向だった。単一の手札枚数gateは落とし、今後は複合bucketまたはcontinuing実戦overrideログからgateを作るべきと判断した。
+
+### ユーザー入力
+`hand_count=5` と `hand_count=4` についても確認するよう依頼した。
+
+### Codex回答
+評価CLIへ `--one-to-two-hand-count` の完全一致gateを追加し、同じ未使用seed 2700000の300系列で確認した。`hand_count=5` はp0 share 0.254232対heuristic 0.254282、paired delta -0.000049、95%CI [-0.007850, +0.007751]、overrides 172で実質中立だった。`hand_count=4` はp0 share 0.255355対heuristic 0.254282、paired delta +0.001073、95%CI [-0.001647, +0.003792]、overrides 15で、変更数が少なく悪化寄りだった。手札枚数だけのgateは単独では有望ではないと判断した。
