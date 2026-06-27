@@ -764,6 +764,62 @@ target and sorted-rank observation is not enough. The remaining issue is more
 likely target/feature alignment with continuing play, or the need for
 continuing-policy override diagnostics rather than validation-target buckets.
 
+### Sorted-Rank Data Scaling Run 004
+
+Run 004 doubled the sorted-hand/rank one-to-two training volume again to check
+whether run 003 was still data-limited:
+
+```text
+extra train: 14,740 samples / 1,501 source seeds
+combined train with run 002 and run 003: 29,460 samples
+one-to-two filtered training subset: 12,982 samples
+fixed validation: 532 one-to-two samples from run 002 validation
+```
+
+The new one-to-two filtered model improved magnitude error slightly versus run
+003, but its balanced sign accuracy remained below the run 002 one-to-two
+model and below the heuristic sign baseline:
+
+```text
+best epoch                        = 15
+validation MAE                    = 3.220
+validation RMSE                   = 4.447
+validation sign accuracy          = 0.6015
+validation balanced sign accuracy = 0.5599
+heuristic sign accuracy            = 0.6090
+```
+
+On the validation target, higher thresholds filtered out many bad overrides but
+also reduced coverage:
+
+```text
+threshold  changed  total target improvement  mean per change
+0.25       101      -64.1875                  -0.6355
+0.50        68      -29.0625                  -0.4274
+0.75        35       +6.5625                  +0.1875
+```
+
+A small multi-threshold continuing evaluation runner now evaluates multiple
+thresholds while sharing one heuristic baseline. This avoids rerunning the same
+heuristic-only 1,000 sequences for each threshold. With 1,000 continuing
+sequences, 200 learner turns, `one_to_two_only` mode, and seed start
+`3200000`, run 004 produced:
+
+```text
+threshold  p0 share  heuristic  paired delta  95% CI                 overrides
+0.25       0.245665  0.250868   -0.005202     [-0.011233, +0.000828]  2397
+0.50       0.247359  0.250868   -0.003509     [-0.008781, +0.001763]  1521
+0.75       0.248813  0.250868   -0.002055     [-0.006197, +0.002088]   856
+```
+
+All three thresholds were favorable on the 1,000-sequence average, but every
+95% interval still crossed zero. The ordering is also different from the fixed
+validation-target diagnostic, where `0.75` looked best. This supports treating
+the current four-turn K=4 target as a noisy proxy for continuing play rather
+than as a direct threshold selector. The practical current read is that the
+doubled sorted-rank model is not obviously harmful, but it has not beaten the
+older original K=4 `one_to_two_only / threshold=0.5` result decisively.
+
 Run 001 collected 9,838 train samples from 1,001 seeds and 2,465 validation
 samples from a separate 250 seeds. The advantage model produced validation MAE
 `2.984`, RMSE `4.241`, and balanced sign accuracy `0.548`.

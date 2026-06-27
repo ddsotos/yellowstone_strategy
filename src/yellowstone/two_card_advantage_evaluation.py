@@ -334,6 +334,148 @@ def evaluate_two_card_advantage_model_continuing(
     )
 
 
+def evaluate_two_card_advantage_model_continuing_thresholds(
+    model_path: Path,
+    *,
+    seeds: tuple[int, ...],
+    advantage_thresholds: tuple[float, ...],
+    learner_turns: int,
+    max_actions: int = 100_000,
+    policy_mode: str = "unrestricted",
+    confirmation_model_path: Path | None = None,
+    confirmation_advantage_threshold: float | None = None,
+    one_to_two_min_hand_count: int | None = None,
+    one_to_two_hand_count: int | None = None,
+) -> tuple[ContinuingTwoCardAdvantageEvaluationResult, ...]:
+    """Evaluate multiple thresholds while sharing the heuristic baseline."""
+    if not advantage_thresholds:
+        raise ValueError("advantage_thresholds must not be empty")
+    if any(threshold < 0 for threshold in advantage_thresholds):
+        raise ValueError("advantage_thresholds must not contain negative values")
+    if not seeds:
+        raise ValueError("seeds must not be empty")
+    if learner_turns <= 0:
+        raise ValueError("learner_turns must be positive")
+    heuristic_results = tuple(
+        _run_continuing_match(
+            (HeuristicBot(), HeuristicBot(), HeuristicBot(), HeuristicBot()),
+            seed=seed,
+            learner_turns=learner_turns,
+            max_actions=max_actions,
+        )
+        for seed in seeds
+    )
+    heuristic_summary = _summarize_continuing_results(
+        heuristic_results,
+        player_count=4,
+        learner_turns=learner_turns,
+    )
+    results: list[ContinuingTwoCardAdvantageEvaluationResult] = []
+    for threshold in advantage_thresholds:
+        (
+            model_results,
+            decision_count,
+            two_card_decision_count,
+            heuristic_fallback_count,
+            directional_override_count,
+        ) = _run_continuing_model_results(
+            model_path,
+            seeds=seeds,
+            advantage_threshold=threshold,
+            learner_turns=learner_turns,
+            max_actions=max_actions,
+            policy_mode=policy_mode,
+            confirmation_model_path=confirmation_model_path,
+            confirmation_advantage_threshold=confirmation_advantage_threshold,
+            one_to_two_min_hand_count=one_to_two_min_hand_count,
+            one_to_two_hand_count=one_to_two_hand_count,
+        )
+        (
+            paired_deltas,
+            paired_delta,
+            paired_ci_low,
+            paired_ci_high,
+        ) = _paired_p0_loss_share_stats(tuple(model_results), heuristic_results)
+        results.append(
+            ContinuingTwoCardAdvantageEvaluationResult(
+                model_vs_heuristic=_summarize_continuing_results(
+                    tuple(model_results),
+                    player_count=4,
+                    learner_turns=learner_turns,
+                ),
+                heuristic_only=heuristic_summary,
+                advantage_threshold=threshold,
+                decision_count=decision_count,
+                two_card_decision_count=two_card_decision_count,
+                heuristic_fallback_count=heuristic_fallback_count,
+                policy_mode=policy_mode,
+                confirmation_model_path=(
+                    None
+                    if confirmation_model_path is None
+                    else str(confirmation_model_path)
+                ),
+                confirmation_advantage_threshold=confirmation_advantage_threshold,
+                one_to_two_min_hand_count=one_to_two_min_hand_count,
+                one_to_two_hand_count=one_to_two_hand_count,
+                directional_override_count=directional_override_count,
+                paired_p0_loss_share_deltas=paired_deltas,
+                paired_p0_loss_share_delta=paired_delta,
+                paired_p0_loss_share_ci95_low=paired_ci_low,
+                paired_p0_loss_share_ci95_high=paired_ci_high,
+            )
+        )
+    return tuple(results)
+
+
+def _run_continuing_model_results(
+    model_path: Path,
+    *,
+    seeds: tuple[int, ...],
+    advantage_threshold: float,
+    learner_turns: int,
+    max_actions: int,
+    policy_mode: str,
+    confirmation_model_path: Path | None,
+    confirmation_advantage_threshold: float | None,
+    one_to_two_min_hand_count: int | None,
+    one_to_two_hand_count: int | None,
+) -> tuple[list[_ContinuingMatchResult], int, int, int, int]:
+    model_results = []
+    decision_count = 0
+    two_card_decision_count = 0
+    heuristic_fallback_count = 0
+    directional_override_count = 0
+    for seed in seeds:
+        bot = LearnedTwoCardAdvantageBot(
+            model_path=model_path,
+            advantage_threshold=advantage_threshold,
+            policy_mode=policy_mode,
+            confirmation_model_path=confirmation_model_path,
+            confirmation_advantage_threshold=confirmation_advantage_threshold,
+            one_to_two_min_hand_count=one_to_two_min_hand_count,
+            one_to_two_hand_count=one_to_two_hand_count,
+        )
+        model_results.append(
+            _run_continuing_match(
+                (bot, HeuristicBot(), HeuristicBot(), HeuristicBot()),
+                seed=seed,
+                learner_turns=learner_turns,
+                max_actions=max_actions,
+            )
+        )
+        decision_count += bot.decision_count
+        two_card_decision_count += bot.two_card_decision_count
+        heuristic_fallback_count += bot.heuristic_fallback_count
+        directional_override_count += bot.directional_override_count
+    return (
+        model_results,
+        decision_count,
+        two_card_decision_count,
+        heuristic_fallback_count,
+        directional_override_count,
+    )
+
+
 def evaluation_result_to_dict(
     result: TwoCardAdvantageEvaluationResult,
 ) -> dict[str, object]:
@@ -407,7 +549,7 @@ def main() -> None:
     parser.add_argument("model_path", type=Path)
     parser.add_argument("--seed-start", type=int, default=600_000)
     parser.add_argument("--games", type=int, default=100)
-    parser.add_argument("--advantage-threshold", type=float, required=True)
+    parser.add_argument("--advantage-threshold", type=float, action="append", required=True)
     parser.add_argument("--continuing-learner-turns", type=int)
     parser.add_argument("--max-actions", type=int, default=100_000)
     parser.add_argument(
@@ -428,18 +570,22 @@ def main() -> None:
     args = parser.parse_args()
     seeds = tuple(range(args.seed_start, args.seed_start + args.games))
     if args.continuing_learner_turns is None:
+        if len(args.advantage_threshold) != 1:
+            raise ValueError(
+                "multiple advantage thresholds require --continuing-learner-turns"
+            )
         result = evaluate_two_card_advantage_model(
             args.model_path,
             seeds=seeds,
-            advantage_threshold=args.advantage_threshold,
+            advantage_threshold=args.advantage_threshold[0],
             policy_mode=args.policy_mode,
         )
         result_dict = evaluation_result_to_dict(result)
     else:
-        continuing_result = evaluate_two_card_advantage_model_continuing(
+        continuing_results = evaluate_two_card_advantage_model_continuing_thresholds(
             args.model_path,
             seeds=seeds,
-            advantage_threshold=args.advantage_threshold,
+            advantage_thresholds=tuple(args.advantage_threshold),
             learner_turns=args.continuing_learner_turns,
             max_actions=args.max_actions,
             policy_mode=args.policy_mode,
@@ -448,7 +594,15 @@ def main() -> None:
             one_to_two_min_hand_count=args.one_to_two_min_hand_count,
             one_to_two_hand_count=args.one_to_two_hand_count,
         )
-        result_dict = continuing_evaluation_result_to_dict(continuing_result)
+        if len(continuing_results) == 1:
+            result_dict = continuing_evaluation_result_to_dict(
+                continuing_results[0]
+            )
+        else:
+            result_dict = [
+                continuing_evaluation_result_to_dict(result)
+                for result in continuing_results
+            ]
     if args.json_output is not None:
         args.json_output.parent.mkdir(parents=True, exist_ok=True)
         args.json_output.write_text(json.dumps(result_dict, indent=2), encoding="utf-8")

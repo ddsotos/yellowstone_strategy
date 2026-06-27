@@ -532,3 +532,10 @@ run002の1→2専用モデルを半無限200 learner turnsで評価した。seed
 
 ### Codex回答
 追加K=4 continuing trainデータ9,801件をseed 2800000から生成し、run002の4,919件と合わせて14,720件で再学習した。1→2専用の学習対象は6,541件になった。固定validationではMAE 3.277、RMSE 4.524と少し改善したが、balanced sign accuracyは0.5507でrun002の0.572より低下した。半無限300系列ではp0 share 0.258176対heuristic 0.254282、paired delta +0.003894、95%CI [-0.005585, +0.013374]、overrides 428で悪化方向だった。現仕様では単純なデータ増量だけでは改善せず、target/特徴のcontinuing整合や実戦override診断が課題と判断した。
+## 2026-06-27
+
+### ユーザー入力
+学習量を倍にしたうえで、multi-threshold評価runnerを小さく追加して、0.25, 0.50, 0.75 を1000系列で一括評価するところまで進めてほしい。
+
+### Codex回答
+sorted-hand/rankの1→2専用モデルについて、追加K=4 continuing教師データ14,740件を作り、run002/run003と合わせて29,460件から one-to-two filtered 12,982件で再学習した。multi-threshold continuing評価runnerを追加し、heuristic baselineを1回だけ共有して複数閾値を評価できるようにした。1000系列・200 learner turns・`one_to_two_only`では、threshold 0.25/0.50/0.75 の paired p0 loss share delta がそれぞれ `-0.005202`, `-0.003509`, `-0.002055` と平均では全て改善方向だったが、95%CIはいずれも0をまたいだ。現時点では倍量sorted-rankモデルは悪くないが、旧K=4 `threshold=0.5` を決定的に上回ったとは言えないと判断した。

@@ -5,6 +5,7 @@ from yellowstone.two_card_advantage_evaluation import (
     ContinuingTwoCardAdvantageEvaluationResult,
     LearnedTwoCardAdvantageBot,
     continuing_evaluation_result_to_dict,
+    evaluate_two_card_advantage_model_continuing_thresholds,
 )
 
 
@@ -100,3 +101,14 @@ def test_continuing_advantage_result_serializes_loss_deltas() -> None:
     assert data["directional_override_count"] == 10
     assert data["paired_p0_loss_share_deltas"] == (-0.02, 0.0)
     assert data["paired_p0_loss_share_delta"] == -0.01
+
+
+def test_multi_threshold_continuing_evaluation_rejects_empty_thresholds(tmp_path) -> None:
+    # 半無限の複数閾値評価は、少なくとも1つの閾値を必要とする。
+    with pytest.raises(ValueError):
+        evaluate_two_card_advantage_model_continuing_thresholds(
+            tmp_path / "model.pt",
+            seeds=(1,),
+            advantage_thresholds=(),
+            learner_turns=1,
+        )
